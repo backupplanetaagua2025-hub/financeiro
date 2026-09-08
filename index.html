@@ -136,11 +136,30 @@
   .dia-h .dv{font-weight:700;font-size:14px;white-space:nowrap}
   .dia-b{padding:0 0 10px 0;border-top:1px dashed var(--line)}
 
+  /* ---------- barra do dia (aba Hoje) ---------- */
+  .diabar{position:sticky;top:0;z-index:15;background:var(--bg);padding:12px 0 6px;
+    display:flex;gap:8px;align-items:stretch}
+  .diabar button{width:44px;border:1px solid var(--line);background:var(--card);border-radius:13px;
+    font-size:20px;color:var(--azul);cursor:pointer;box-shadow:var(--shadow);line-height:1;padding:0}
+  .diabar button:disabled{opacity:.3;cursor:default}
+  .diabar .dsel{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);
+    border-radius:13px;box-shadow:var(--shadow);padding:8px 10px;text-align:center}
+  .diabar input[type=date]{border:0;background:none;font-size:16px;font-weight:700;color:var(--ink);
+    width:100%;text-align:center;font-family:inherit;-webkit-appearance:none;padding:0}
+  .diabar .dsel span{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-top:1px}
+  .hojebtn[hidden]{display:none}
+  .hojebtn{display:block;width:100%;margin-top:8px;padding:9px;border:1px solid var(--line);
+    background:var(--card);border-radius:11px;font-size:12.5px;font-weight:700;color:var(--azul);
+    cursor:pointer;box-shadow:var(--shadow)}
+  .resumo{background:var(--card);border-radius:14px;box-shadow:var(--shadow);margin-top:14px;
+    padding:14px;font-size:12.5px;line-height:1.6;color:var(--ink)}
+  .resumo b{color:var(--azul)}
+
   /* ---------- abas ---------- */
   nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.96);
     backdrop-filter:blur(10px);border-top:1px solid var(--line);
     padding:6px 4px calc(6px + env(safe-area-inset-bottom));display:flex;justify-content:center}
-  nav.tabs .in{max-width:560px;width:100%;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
+  nav.tabs .in{max-width:560px;width:100%;display:grid;grid-template-columns:repeat(6,1fr);gap:2px}
   nav.tabs button{background:none;border:0;padding:6px 2px;cursor:pointer;color:var(--muted);
     font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px;
     border-radius:10px;line-height:1.1}
@@ -196,7 +215,38 @@
     <div class="mesbar" id="mesbar"><select id="mes"></select></div>
 
     <!-- ================= ABA: MÊS ================= -->
-    <div class="tab" id="t-mes">
+    <!-- ================= HOJE ================= -->
+    <div class="tab" id="t-hoje">
+      <div class="diabar">
+        <button id="d-ant" title="Dia anterior">&lsaquo;</button>
+        <div class="dsel">
+          <input type="date" id="d-data">
+          <span id="d-legenda"></span>
+        </div>
+        <button id="d-prox" title="Pr&oacute;ximo dia">&rsaquo;</button>
+      </div>
+      <button class="hojebtn" id="d-hoje" hidden>Voltar para hoje</button>
+
+      <div class="cards" id="cards-dia"></div>
+      <div id="d-resumo"></div>
+
+      <section>
+        <div class="sec-h open" data-alvo="b-diaitens"><h2>Lan&ccedil;amentos do dia</h2><span class="cnt" id="c-diaitens"></span><span class="arw">&rsaquo;</span></div>
+        <div class="sec-b" id="b-diaitens"></div>
+      </section>
+
+      <section>
+        <div class="sec-h open" data-alvo="b-diames"><h2 id="h-diames">No m&ecirc;s at&eacute; aqui</h2><span class="cnt" id="c-diames"></span><span class="arw">&rsaquo;</span></div>
+        <div class="sec-b" id="b-diames"></div>
+      </section>
+
+      <section>
+        <div class="sec-h" data-alvo="b-diaevol"><h2>Dia a dia do m&ecirc;s</h2><span class="cnt" id="c-diaevol"></span><span class="arw">&rsaquo;</span></div>
+        <div class="sec-b" id="b-diaevol" hidden></div>
+      </section>
+    </div>
+
+    <div class="tab" id="t-mes" hidden>
       <div class="cards" id="cards"></div>
 
       <section>
@@ -315,7 +365,8 @@
 
 <nav class="tabs" id="tabs" hidden>
   <div class="in">
-    <button data-tab="t-mes" class="on"><b>📅</b>Mês</button>
+    <button data-tab="t-hoje" class="on"><b>☀️</b>Hoje</button>
+    <button data-tab="t-mes"><b>📅</b>Mês</button>
     <button data-tab="t-res"><b>🎯</b>Resultado</button>
     <button data-tab="t-desp"><b>💸</b>Despesas</button>
     <button data-tab="t-prod"><b>📦</b>Produtos</button>
@@ -605,7 +656,7 @@ function agregarAno(){
 }
 
 /* ---------------- interface ---------------- */
-let mesAtual=0, filtro='tudo', busca='', aba='t-mes';
+let mesAtual=0, filtro='tudo', busca='', aba='t-hoje';
 
 function montar(){
   const sel=$('mes'); sel.innerHTML='';
@@ -630,11 +681,23 @@ function montar(){
       aba=b.dataset.tab;
       document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.toggle('on',x===b));
       document.querySelectorAll('.tab').forEach(t=>t.hidden = t.id!==aba);
-      $('mesbar').hidden = (aba==='t-ano');
+      $('mesbar').hidden = (aba==='t-ano'||aba==='t-hoje');
       window.scrollTo({top:0});
     };
   });
 
+  /* seletor de dia da aba Hoje */
+  const hj = meiaNoite(new Date());
+  const ultimo = comDados[comDados.length-1];
+  diaSel = (hj.getFullYear()===2026) ? hj
+         : (ultimo.dias.length ? ultimo.dias[0].data : hj);
+  $('d-data').value = isoData(diaSel);
+  $('d-data').onchange = e=>{ const d=dt(e.target.value); if(d) irParaDia(d); else $('d-data').value=isoData(diaSel); };
+  $('d-ant').onclick  = ()=>irParaDia(new Date(diaSel.getFullYear(),diaSel.getMonth(),diaSel.getDate()-1));
+  $('d-prox').onclick = ()=>irParaDia(new Date(diaSel.getFullYear(),diaSel.getMonth(),diaSel.getDate()+1));
+  $('d-hoje').onclick = ()=>irParaDia(meiaNoite(new Date()));
+
+  $('mesbar').hidden = (aba==='t-ano'||aba==='t-hoje');
   $('carregando').hidden=true; $('app').hidden=false; $('tabs').hidden=false;
   render(); anual();
 }
@@ -642,10 +705,184 @@ function montar(){
 function render(){
   const m=DADOS[mesAtual];
   $('titulo').firstChild.textContent = 'Painel Financeiro ';
+  telaDia();
   cardsMes(m); dias(m); pendentes(m); lancamentos(m);
   equilibrio(m); metas(m); dre(m); indicadores(m); caixaComp(m);
   despesas(m); pessoais(m); contasPagar(); capitalGiro();
   produtosMes(m); produtosAno(); margens(); clientes(m);
+}
+
+
+/* ================= ABA HOJE ================= */
+let diaSel = meiaNoite(new Date());
+
+const isoData = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const porExtenso = d => SEM[d.getDay()]+', '+d.getDate()+' de '+NOMES[d.getMonth()].toLowerCase()+' de '+d.getFullYear();
+
+function irParaDia(d){
+  diaSel = meiaNoite(d);
+  $('d-data').value = isoData(diaSel);
+  const mi = (diaSel.getFullYear()===2026) ? diaSel.getMonth() : mesAtual;
+  if(DADOS[mi] && DADOS[mi].temDados && mi!==mesAtual){
+    mesAtual = mi; $('mes').value = mi; busca=''; filtro='tudo'; render();
+  } else telaDia();
+  window.scrollTo({top:0});
+}
+
+/* capital de giro "A Devolver" lançado até o dia escolhido */
+function giroAte(mi, ate){
+  return GIROLIST.filter(g=>g.data && g.data.getFullYear()===2026 && g.data.getMonth()===mi
+      && norm(g.status)==='a devolver' && g.data<=ate).reduce((s,g)=>s+g.valor,0);
+}
+
+/* números do mês até o dia escolhido — mesmas regras dos cartões da planilha */
+function mesAte(m, ate){
+  const r={ent:0,taxas:0,receber:0,brutas:0,prolab:0,nVendas:0,ticket:0,fat:0,desp:0,saldo:0,giro:0};
+  if(!m) return r;
+  let somaV=0;
+  m.itens.forEach(i=>{
+    if(!i.data || i.data>ate) return;
+    r.ent+=i.ent; r.taxas+=i.taxa;
+    if(i.prolab) r.prolab+=i.sai; else r.brutas+=i.sai;
+    if(i.pend) r.receber+=i.ent;
+    if(i.tipo==='venda' && i.ent>0){ r.nVendas++; somaV+=i.ent; }
+  });
+  r.giro = m.novo ? giroAte(m.mes, ate) : 0;
+  r.fat  = m.novo ? r.ent - r.taxas - r.receber : r.ent;
+  r.desp = Math.max(0, r.brutas - r.giro);
+  r.saldo= r.fat - r.desp;
+  r.ticket = r.nVendas ? somaV/r.nVendas : 0;
+  return r;
+}
+
+function telaDia(){
+  const m = (diaSel.getFullYear()===2026) ? DADOS[diaSel.getMonth()] : null;
+  const D = (m && m.dias.find(x=>x.data.getTime()===diaSel.getTime())) || null;
+  const hj = meiaNoite(new Date());
+  const ehHoje = diaSel.getTime()===hj.getTime();
+
+  $('d-legenda').textContent = (ehHoje?'hoje · ':'') + porExtenso(diaSel);
+  $('d-hoje').hidden = ehHoje;
+  $('d-prox').disabled = diaSel>=hj;
+
+  const ent=D?D.ent:0, sai=D?D.saiLoja:0, taxa=D?D.taxa:0, pend=D?D.pend:0, pes=D?D.saiPes:0;
+  const vendasDia = D ? D.itens.filter(i=>i.tipo==='venda' && i.ent>0) : [];
+  const nv = vendasDia.length;
+  const ticket = nv ? vendasDia.reduce((s,i)=>s+i.ent,0)/nv : 0;
+  const liq = ent - taxa - pend;
+  const saldo = liq - sai;
+
+  /* cartões do dia */
+  const desc=[];
+  if(taxa) desc.push('taxa de máquina '+brl(taxa));
+  if(pend) desc.push('ainda não pago '+brl(pend));
+  const catDia={}; if(D) D.itens.forEach(i=>{ if(i.sai>0 && !i.prolab && i.cat) catDia[i.cat]=(catDia[i.cat]||0)+i.sai; });
+  const topCat = Object.entries(catDia).sort((a,b)=>b[1]-a[1])[0];
+
+  const cs=[
+    {r:'Entradas do dia', v:ent, c:'var(--verde)',
+     o: nv ? nv+(nv===1?' venda · ticket ':' vendas · ticket ')+brl(ticket) : 'nenhuma venda no dia'},
+    {r:'Saídas da loja', v:sai, c:'var(--vermelho)',
+     o: topCat ? 'maior: '+topCat[0].toLowerCase() : 'nenhuma despesa no dia'},
+    {r:'Saldo do dia', v:saldo, c: saldo>=0?'var(--verdeEsc)':'var(--vermelho)', w:true,
+     o: desc.length ? 'entradas menos '+desc.join(' e ')+', menos as saídas' : 'entradas menos saídas do dia'}
+  ];
+  if(pend) cs.push({r:'A receber do dia', v:pend, c:'var(--ambar)', o:'vendas aguardando pagamento'});
+  if(pes)  cs.push({r:'Pessoal (pró-labore)', v:pes, c:'var(--roxo)', o:'fora das despesas da loja'});
+  $('cards-dia').innerHTML = cs.map(c=>`<div class="card${c.w?' wide':''}" style="--c:${c.c}">
+      <div class="rot">${c.r}</div><div class="val" style="color:${c.c}">${brl(c.v)}</div>
+      <div class="obs">${c.o}</div></div>`).join('');
+
+  /* resumo em texto + formas de pagamento */
+  if(!D){
+    $('d-resumo').innerHTML = `<div class="resumo">${ehHoje
+      ? 'Nenhum lançamento neste dia ainda. Assim que as vendas forem lançadas na planilha e o arquivo for atualizado, elas aparecem aqui.'
+      : 'Nenhum lançamento registrado neste dia.'}</div>`;
+  } else {
+    const fp={};
+    vendasDia.forEach(v=>{ const k=v.forma||'não informado'; if(!fp[k]) fp[k]={v:0,n:0}; fp[k].v+=v.ent; fp[k].n++; });
+    const cores={'dinheiro':'#1e7b34','pix':'#0f3d5c','debito':'#0f9d8b','credito a vista':'#6b4fa0',
+                 'credito parcelado':'#155f83','aguardando pagamento':'#b7791f'};
+    const listaFp = Object.entries(fp).sort((a,b)=>b[1].v-a[1].v);
+    const totFp = listaFp.reduce((s,[,o])=>s+o.v,0)||1;
+    const maior = vendasDia.slice().sort((a,b)=>b.ent-a.ent)[0];
+    const frases=[];
+    if(nv) frases.push(`<b>${nv}</b> ${nv===1?'venda':'vendas'} somando <b>${brl(ent)}</b>, ticket médio ${brl(ticket)}.`);
+    if(maior) frases.push(`Maior venda: ${esc(maior.nome)} — ${brl(maior.ent)}${maior.produto?' ('+esc(maior.produto)+')':''}.`);
+    const nd = D.itens.filter(i=>i.sai>0 && !i.prolab).length;
+    if(nd) frases.push(`${nd} ${nd===1?'saída':'saídas'} da loja somando ${brl(sai)}.`);
+    if(pend) frases.push(`<b>${brl(pend)}</b> saiu em produto mas ainda não entrou no caixa.`);
+    $('d-resumo').innerHTML = `<div class="resumo">${frases.join(' ')||'Dia sem vendas.'}
+      ${listaFp.length ? `<div class="split" style="margin-top:12px">`+
+        listaFp.map(([k,o])=>`<i style="width:${o.v/totFp*100}%;background:${cores[norm(k)]||'#6b7c8c'}"></i>`).join('')+
+        `</div><div class="leg">`+
+        listaFp.map(([k,o])=>`<span><i style="background:${cores[norm(k)]||'#6b7c8c'}"></i>${esc(k)} ${brl(o.v)}</span>`).join('')+
+        `</div>` : ''}</div>`;
+  }
+
+  /* lançamentos do dia */
+  const itens = D ? D.itens.slice().sort((a,b)=>
+      (a.tipo===b.tipo ? (b.ent+b.sai)-(a.ent+a.sai) : (a.tipo==='venda'?-1:1))) : [];
+  $('c-diaitens').textContent = itens.length ? itens.length+(itens.length===1?' lançamento':' lançamentos') : 'nenhum';
+  $('b-diaitens').innerHTML = itens.length ? itens.map(itemHTML).join('')
+    : '<div class="empty">Sem lançamentos neste dia.</div>';
+
+  /* no mês até aqui */
+  const R = mesAte(m, diaSel);
+  const nomeMes = m ? m.nome : NOMES[diaSel.getMonth()];
+  $('h-diames').textContent = 'Em '+nomeMes+' até dia '+String(diaSel.getDate()).padStart(2,'0');
+  $('c-diames').textContent = brl(R.saldo);
+  const kv = [
+    ['Faturamento', brl(R.fat), 'var(--verde)'],
+    ['Despesas da loja', brl(R.desp), 'var(--vermelho)'],
+    ['Saldo até aqui', brl(R.saldo), R.saldo>=0?'var(--verdeEsc)':'var(--vermelho)'],
+    ['A receber', brl(R.receber), 'var(--ambar)'],
+    ['Vendas', R.nVendas+(R.nVendas===1?' venda':' vendas'), 'var(--ink)'],
+    ['Ticket médio', brl(R.ticket), 'var(--ink)']
+  ];
+  $('b-diames').innerHTML = kv.map(([k,v,c])=>
+    `<div class="kv"><div class="k">${k}</div><div class="vv" style="color:${c}">${v}</div></div>`).join('')
+    + (R.giro ? `<div class="nota">Capital de giro a devolver no mês (${brl(R.giro)}) já está fora das despesas.</div>` : '');
+
+  /* dia a dia do mês, com o dia escolhido em destaque */
+  const dias2 = m ? m.dias.slice().sort((a,b)=>b.data-a.data) : [];
+  $('c-diaevol').textContent = dias2.length + (dias2.length===1?' dia':' dias');
+  if(!dias2.length){ $('b-diaevol').innerHTML='<div class="empty">Sem lançamentos neste mês.</div>'; }
+  else {
+    const ord=[...dias2].sort((a,b)=>a.data-b.data);
+    const maxF=Math.max(...ord.map(d=>Math.abs(d.fat)),1);
+    const W=Math.max(300, ord.length*22), H=90, base=H-18;
+    const barras=ord.map((d,k)=>{
+      const h=Math.max(2,(Math.abs(d.fat)/maxF)*(base-6));
+      const sel=d.data.getTime()===diaSel.getTime();
+      return `<rect x="${k*22+5}" y="${base-h}" width="13" height="${h}" rx="3"
+                fill="${sel?'#0f3d5c':(d.saldo>=0?'#0f9d8b':'#c0392b')}"/>
+              <text x="${k*22+11.5}" y="${base+13}" text-anchor="middle" font-size="9"
+                font-weight="${sel?'700':'400'}" fill="${sel?'#0f3d5c':'#6b7c8c'}">${d.data.getDate()}</text>`;
+    }).join('');
+    const linhas=dias2.map(d=>{
+      const sel=d.data.getTime()===diaSel.getTime();
+      const cor=d.saldo>=0?'var(--verdeEsc)':'var(--vermelho)';
+      const det=[];
+      if(d.nVendas) det.push(d.nVendas+(d.nVendas===1?' venda':' vendas'));
+      if(d.fat) det.push('entrou '+brl(d.fat));
+      if(d.saiLoja) det.push('saiu '+brl(d.saiLoja));
+      return `<div class="dia"><div class="dia-h" data-ir="${isoData(d.data)}"
+          style="${sel?'background:var(--bg);border-radius:10px;padding-left:8px;padding-right:8px':''}">
+          <div class="dd">${String(d.data.getDate()).padStart(2,'0')}/${String(d.data.getMonth()+1).padStart(2,'0')}</div>
+          <div class="ds">${SEM[d.data.getDay()]}<br>${det.join(' · ')||'sem movimento'}</div>
+          <div class="dv" style="color:${cor}">${brl(d.saldo)}</div></div></div>`;
+    }).join('');
+    $('b-diaevol').innerHTML =
+      `<div class="leg"><span><i style="background:#0f3d5c"></i>dia aberto</span>
+        <span><i style="background:#0f9d8b"></i>positivo</span><span><i style="background:#c0392b"></i>negativo</span></div>
+       <div class="scroll"><svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">
+         <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="#dde5ec"/>${barras}</svg></div>
+       <div style="margin-top:8px">${linhas}</div>`;
+    $('b-diaevol').querySelectorAll('.dia-h').forEach(h=>{
+      h.onclick=()=>{ const d=dt(h.dataset.ir); if(d) irParaDia(d); };
+    });
+  }
 }
 
 /* ================= ABA MÊS ================= */
