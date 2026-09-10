@@ -276,6 +276,28 @@
   @media (prefers-reduced-motion:reduce){
     nav.tabs .ind,nav.tabs button,nav.tabs button b,nav.tabs button b svg{transition:none}}
 
+  /* ---------- filtro de período das contas a pagar ---------- */
+  .per{display:flex;gap:8px;align-items:flex-end;margin-bottom:4px}
+  .per .cx{flex:1;min-width:0;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:6px 9px}
+  .per .cx label{display:block;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+  .per input[type=date]{border:0;background:none;font-size:14px;font-weight:700;color:var(--ink);
+    width:100%;font-family:inherit;-webkit-appearance:none;padding:2px 0}
+  html[data-tema="escuro"] .per input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1) opacity(.7)}
+  .copiar{display:block;width:100%;margin-top:10px;padding:11px;border:1px solid var(--line);
+    background:var(--card);border-radius:12px;font-size:13px;font-weight:700;color:var(--azul);
+    cursor:pointer;box-shadow:var(--shadow);transition:transform .12s ease,background .18s ease}
+  .copiar:active{transform:scale(.98)}
+  .copiar.ok{background:var(--verde);border-color:var(--verde);color:#fff}
+
+  /* ---------- contas previstas (sem boleto) ---------- */
+  .row.ehprev{background:color-mix(in srgb,var(--ambar) 7%,transparent);border-radius:10px}
+  @supports not (background:color-mix(in srgb,red 50%,transparent)){ .row.ehprev{background:var(--card2)} }
+  .row.ehprev .n,.row.ehprev .v{color:var(--ambar)}
+  .row.ehprev .n{font-style:italic}
+  .tag.prev{background:color-mix(in srgb,var(--ambar) 16%,transparent);color:var(--ambar)}
+  @supports not (background:color-mix(in srgb,red 50%,transparent)){ .tag.prev{background:var(--tagbg);color:var(--ambar)} }
+  .subt{margin:14px 0 6px;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ambar)}
+
   /* ---------- entradas animadas ---------- */
   @keyframes surge{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   .anim{animation:surge .5s cubic-bezier(.22,.8,.3,1) backwards;animation-delay:calc(var(--i,0)*50ms)}
@@ -844,6 +866,7 @@ function tentar(){
 if($('gate')){ $('entrar').onclick=tentar; $('pw').onkeydown=e=>{if(e.key==='Enter')tentar()}; }
 
 /* ---------------- leitura da planilha ---------------- */
+let pgDe='', pgAte='', pgPreset='tudo';
 let WB=null, DADOS=[], GIRO=[], GIROLIST=[], PAGAR=[], PRECOS=[], CFG={taxaCartao:.07,imposto:.06,reserva:0,mesesCob:3,aliquota:.06,vencDAS:20};
 
 async function carregar(){
@@ -905,7 +928,7 @@ function processar(buf){
     const L=cp[i]||[]; const nome=String(L[0]||'').trim(); const v=num(L[3]);
     const na=norm(nome);
     /* o bloco de CONTAS A RECEBER vem logo abaixo na mesma aba — para aqui */
-    if(na.startsWith('total em aberto') || na.startsWith('contas a receber')) break;
+    if(na.startsWith('total') || na.startsWith('previsto') || na.startsWith('contas a receber')) break;
     if(!nome || !v) continue;
     const st=String(L[4]||'');
     if(norm(st)==='pago') continue;
@@ -1583,21 +1606,107 @@ function pessoais(m){
 
 function contasPagar(){
   const hoje=new Date(); hoje.setHours(0,0,0,0);
-  const tot=PAGAR.reduce((s,p)=>s+p.valor,0);
-  $('c-pagar').textContent = PAGAR.length? PAGAR.length+' · '+brl(tot) : 'nada em aberto';
-  $('b-pagar').innerHTML = PAGAR.length
-    ? PAGAR.map(p=>{
+  const iso = d => d ? d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') : '';
+  const maisDias = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+
+  const presets = {
+    tudo:    ()=>['',''],
+    mes:     ()=>[iso(new Date(hoje.getFullYear(),hoje.getMonth(),1)), iso(new Date(hoje.getFullYear(),hoje.getMonth()+1,0))],
+    d30:     ()=>[iso(hoje), iso(maisDias(hoje,30))],
+    proxmes: ()=>[iso(new Date(hoje.getFullYear(),hoje.getMonth()+1,1)), iso(new Date(hoje.getFullYear(),hoje.getMonth()+2,0))],
+    atras:   ()=>['', iso(maisDias(hoje,-1))]
+  };
+
+  const dentro = p => {
+    if(!pgDe && !pgAte) return true;
+    if(!p.venc) return false;
+    const v=iso(p.venc);
+    if(pgDe && v<pgDe) return false;
+    if(pgAte && v>pgAte) return false;
+    return true;
+  };
+
+  const ehPrev = p => norm(p.status)==='previsto';
+  const lista  = PAGAR.filter(dentro);
+  const comBoleto = lista.filter(p=>!ehPrev(p)), previstas = lista.filter(ehPrev);
+  const totB = comBoleto.reduce((s,p)=>s+p.valor,0);
+  const totP = previstas.reduce((s,p)=>s+p.valor,0);
+  const tot  = totB+totP;
+  const totGeral = PAGAR.reduce((s,p)=>s+p.valor,0);
+
+  $('c-pagar').textContent = PAGAR.length? PAGAR.length+' · '+brl(totGeral) : 'nada em aberto';
+
+  const chips=[['tudo','Tudo'],['mes','Este mês'],['d30','Próximos 30 dias'],['proxmes','Próximo mês'],['atras','Já venceu']];
+  const topo = `<div class="per">
+      <div class="cx"><label>De</label><input type="date" id="pg-de" value="${pgDe}"></div>
+      <div class="cx"><label>Até</label><input type="date" id="pg-ate" value="${pgAte}"></div>
+    </div>
+    <div class="chips">${chips.map(([k,t])=>`<span class="chip${pgPreset===k?' on':''}" data-p="${k}">${t}</span>`).join('')}</div>`;
+
+  const linha = p => {
+        const prev = ehPrev(p);
         const atras = p.venc ? Math.floor((hoje-p.venc)/864e5) : 0;
-        const tag = !p.venc ? '' : atras>0 ? `<span class="tag pend">${atras} dia${atras>1?'s':''} em atraso</span>`
+        const tag = prev ? '<span class="tag prev">previsão · sem boleto</span>'
+                  : !p.venc ? '' : atras>0 ? `<span class="tag pend">${atras} dia${atras>1?'s':''} em atraso</span>`
                   : atras===0 ? '<span class="tag pend">vence hoje</span>'
                   : `<span class="tag">vence em ${-atras} dia${atras<-1?'s':''}</span>`;
-        return `<div class="row"><div class="m">
+        return `<div class="row${prev?' ehprev':''}"><div class="m">
           <div class="n">${esc(p.nome)}</div>
           <div class="d">${p.venc?'<b>'+ddmm(p.venc)+'</b> · ':''}${esc(p.desc)}</div>
           ${p.obs?`<div class="d obs" onclick="this.classList.toggle('abrir')">${esc(p.obs)}</div>`:''}
           ${tag}</div><div class="v out">${brl(p.valor)}</div></div>`;
-      }).join('') + `<div class="tot"><span>Total a pagar</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`
-    : '<div class="empty">Nenhuma conta em aberto. 🎉</div>';
+  };
+
+  const totais = previstas.length
+      ? `<div class="tot"><span>Com boleto em mãos</span><span style="color:var(--vermelho)">${brl(totB)}</span></div>`
+       +`<div class="tot"><span style="color:var(--ambar)">Previsão · sem boleto</span><span style="color:var(--ambar)">${brl(totP)}</span></div>`
+       +`<div class="tot"><span>Total do período</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`
+      : `<div class="tot"><span>Total do período</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`;
+
+  const corpo = !PAGAR.length ? '<div class="empty">Nenhuma conta em aberto. 🎉</div>'
+    : !lista.length ? '<div class="empty">Nenhuma conta vencendo neste período.</div>'
+    : comBoleto.map(linha).join('')
+      + (previstas.length ? `<div class="subt">Previsão — boleto ainda não emitido pelo fornecedor</div>`+previstas.map(linha).join('') : '')
+      + totais
+      + `<button class="copiar" id="pg-copiar">📋 Copiar lista para mandar no WhatsApp</button>`;
+
+  $('b-pagar').innerHTML = topo + corpo;
+
+  const rerender = ()=>contasPagar();
+  $('b-pagar').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    pgPreset=c.dataset.p; [pgDe,pgAte]=presets[pgPreset](); rerender();
+  });
+  const de=$('pg-de'), ate=$('pg-ate');
+  if(de)  de.onchange  = e=>{ pgDe=e.target.value;  pgPreset='';  rerender(); };
+  if(ate) ate.onchange = e=>{ pgAte=e.target.value; pgPreset='';  rerender(); };
+
+  const bt=$('pg-copiar');
+  if(bt) bt.onclick=()=>{
+    const per = (pgDe||pgAte) ? ` (${pgDe?ddmm(dt(pgDe)):'início'} a ${pgAte?ddmm(dt(pgAte)):'sem fim'})` : '';
+    let t='*CONTAS A PAGAR'+per.toUpperCase()+'*\n\n';
+    comBoleto.forEach(p=>{ t += (p.venc?ddmm(p.venc):'--/--')+' · '+p.nome+' — '+brl(p.valor)+'\n'; });
+    if(previstas.length){
+      t += '\n_Previsão — boleto ainda não emitido:_\n';
+      previstas.forEach(p=>{ t += (p.venc?ddmm(p.venc):'--/--')+' · '+p.nome+' — '+brl(p.valor)+'\n'; });
+    }
+    t += '\n';
+    if(previstas.length){
+      t += 'Com boleto em mãos: '+brl(totB)+'\n';
+      t += 'Previsão: '+brl(totP)+'\n';
+    }
+    t += '*Total: '+brl(tot)+'*';
+    const feito=()=>{ bt.textContent='✔ Copiado!'; bt.classList.add('ok');
+                      setTimeout(()=>{bt.textContent='📋 Copiar lista para mandar no WhatsApp'; bt.classList.remove('ok');},1800); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(feito).catch(()=>fallback());
+    } else fallback();
+    function fallback(){
+      const ta=document.createElement('textarea'); ta.value=t;
+      ta.style.cssText='position:fixed;top:-1000px'; document.body.appendChild(ta);
+      ta.select(); try{document.execCommand('copy'); feito();}catch(e){alert('Não consegui copiar. Selecione o texto manualmente.');}
+      document.body.removeChild(ta);
+    }
+  };
 }
 
 function capitalGiro(){
