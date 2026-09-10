@@ -289,7 +289,7 @@
   .copiar:active{transform:scale(.98)}
   .copiar.ok{background:var(--verde);border-color:var(--verde);color:#fff}
 
-  /* ---------- contas previstas (sem boleto) ---------- */
+  /* ---------- contas previstas (sem cobrança emitida) ---------- */
   .row.ehprev{background:color-mix(in srgb,var(--ambar) 7%,transparent);border-radius:10px}
   @supports not (background:color-mix(in srgb,red 50%,transparent)){ .row.ehprev{background:var(--card2)} }
   .row.ehprev .n,.row.ehprev .v{color:var(--ambar)}
@@ -1646,7 +1646,8 @@ function contasPagar(){
   const linha = p => {
         const prev = ehPrev(p);
         const atras = p.venc ? Math.floor((hoje-p.venc)/864e5) : 0;
-        const tag = prev ? '<span class="tag prev">previsão · sem boleto</span>'
+        const fixo = prev && /\(fixo mensal\)/i.test(p.obs||'');
+        const tag = prev ? `<span class="tag prev">${fixo?'previsão · fixo mensal':'previsão · aguarda boleto'}</span>`
                   : !p.venc ? '' : atras>0 ? `<span class="tag pend">${atras} dia${atras>1?'s':''} em atraso</span>`
                   : atras===0 ? '<span class="tag pend">vence hoje</span>'
                   : `<span class="tag">vence em ${-atras} dia${atras<-1?'s':''}</span>`;
@@ -1659,14 +1660,14 @@ function contasPagar(){
 
   const totais = previstas.length
       ? `<div class="tot"><span>Com boleto em mãos</span><span style="color:var(--vermelho)">${brl(totB)}</span></div>`
-       +`<div class="tot"><span style="color:var(--ambar)">Previsão · sem boleto</span><span style="color:var(--ambar)">${brl(totP)}</span></div>`
+       +`<div class="tot"><span style="color:var(--ambar)">Previsão</span><span style="color:var(--ambar)">${brl(totP)}</span></div>`
        +`<div class="tot"><span>Total do período</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`
       : `<div class="tot"><span>Total do período</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`;
 
   const corpo = !PAGAR.length ? '<div class="empty">Nenhuma conta em aberto. 🎉</div>'
     : !lista.length ? '<div class="empty">Nenhuma conta vencendo neste período.</div>'
     : comBoleto.map(linha).join('')
-      + (previstas.length ? `<div class="subt">Previsão — boleto ainda não emitido pelo fornecedor</div>`+previstas.map(linha).join('') : '')
+      + (previstas.length ? `<div class="subt">Previsão — compromissos certos, ainda sem cobrança emitida</div>`+previstas.map(linha).join('') : '')
       + totais
       + `<button class="copiar" id="pg-copiar">📋 Copiar lista para mandar no WhatsApp</button>`;
 
@@ -1686,7 +1687,7 @@ function contasPagar(){
     let t='*CONTAS A PAGAR'+per.toUpperCase()+'*\n\n';
     comBoleto.forEach(p=>{ t += (p.venc?ddmm(p.venc):'--/--')+' · '+p.nome+' — '+brl(p.valor)+'\n'; });
     if(previstas.length){
-      t += '\n_Previsão — boleto ainda não emitido:_\n';
+      t += '\n_Previsão — ainda sem cobrança emitida:_\n';
       previstas.forEach(p=>{ t += (p.venc?ddmm(p.venc):'--/--')+' · '+p.nome+' — '+brl(p.valor)+'\n'; });
     }
     t += '\n';
