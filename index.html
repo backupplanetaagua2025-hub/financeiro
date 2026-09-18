@@ -360,6 +360,39 @@
     *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;
       transition-duration:.001ms!important;scroll-behavior:auto!important}
   }
+  /* ---------- PDF do resumo do dia (só aparece na impressão) ---------- */
+  .pdfbtn{color:var(--verdeEsc,var(--verde))}
+  #relDia{display:none}
+  @media print{
+    @page{size:A4 portrait;margin:12mm}
+    html,body{background:#fff !important}
+    body > *:not(#relDia){display:none !important}
+    #relDia{display:block !important;font-family:Arial,Helvetica,sans-serif;color:#111;font-size:9.5pt;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+  #relDia h1{margin:0;font-size:17pt;color:#1F3864}
+  #relDia .rd-sub{margin:2px 0 0;color:#444;font-size:10pt}
+  #relDia .rd-cab{display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2.5px solid #1F3864;padding-bottom:6px;margin-bottom:12px}
+  #relDia .rd-emit{font-size:8.5pt;color:#666;text-align:right}
+  #relDia h2{font-size:11.5pt;color:#1F3864;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.4px}
+  #relDia .rd-cards{display:flex;gap:8px;margin-bottom:8px}
+  #relDia .rd-card{flex:1;border:1px solid #D0D0D0;border-top:4px solid var(--k);border-radius:6px;padding:6px 8px}
+  #relDia .rd-card .r{font-size:7.5pt;text-transform:uppercase;letter-spacing:.4px;color:#555;font-weight:700}
+  #relDia .rd-card .v{font-size:13pt;font-weight:800;color:var(--k);margin-top:2px}
+  #relDia .rd-card .o{font-size:7.5pt;color:#666;margin-top:1px}
+  #relDia table{width:100%;border-collapse:collapse;font-size:8.8pt}
+  #relDia th{background:#1F3864;color:#fff;text-align:left;padding:4px 5px;font-size:8pt}
+  #relDia td{padding:3px 5px;border-bottom:1px solid #D0D0D0;vertical-align:top}
+  #relDia tbody tr:nth-child(even) td{background:#F3F4F6}
+  #relDia .n{text-align:right;white-space:nowrap}
+  #relDia .ent{color:#1E7B34;font-weight:700} #relDia .sai{color:#C0392B;font-weight:700}
+  #relDia .pend{color:#B7791F;font-weight:700}
+  #relDia tfoot td{font-weight:800;border-top:2px solid #1F3864;border-bottom:none;background:#fff}
+  #relDia tr{page-break-inside:avoid}
+  #relDia .rd-fp{margin-top:6px;font-size:8.8pt;color:#333}
+  #relDia .rd-nota{margin-top:6px;font-size:8pt;color:#666;font-style:italic}
+  #relDia .rd-vazio{padding:10px;border:1px dashed #bbb;color:#555;text-align:center}
 </style>
 </head>
 <body>
@@ -402,6 +435,7 @@
         <button id="d-prox" title="Pr&oacute;ximo dia">&rsaquo;</button>
       </div>
       <button class="hojebtn" id="d-hoje" hidden>Voltar para hoje</button>
+      <button class="hojebtn pdfbtn" id="d-pdf">&#128196; Gerar PDF do resumo do dia</button>
 
       <div class="cards" id="cards-dia"></div>
       <div id="d-resumo"></div>
@@ -1141,6 +1175,7 @@ function montar(){
   $('d-ant').onclick  = ()=>irParaDia(new Date(diaSel.getFullYear(),diaSel.getMonth(),diaSel.getDate()-1));
   $('d-prox').onclick = ()=>irParaDia(new Date(diaSel.getFullYear(),diaSel.getMonth(),diaSel.getDate()+1));
   $('d-hoje').onclick = ()=>irParaDia(meiaNoite(new Date()));
+  $('d-pdf').onclick  = pdfDoDia;
 
   $('mesbar').hidden = (aba==='t-ano'||aba==='t-hoje');
   $('carregando').hidden=true; $('app').hidden=false; $('tabs').hidden=false;
@@ -1330,6 +1365,72 @@ function telaDia(){
       h.onclick=()=>{ const d=dt(h.dataset.ir); if(d) irParaDia(d); };
     });
   }
+}
+
+/* ================= PDF DO RESUMO DO DIA =================
+   Monta uma folha própria (#relDia) com o dia aberto na aba Hoje
+   e chama a impressão — no diálogo, escolher "Salvar como PDF".  */
+function relatorioDia(){
+  const m = (diaSel.getFullYear()===2026) ? DADOS[diaSel.getMonth()] : null;
+  const D = (m && m.dias.find(x=>x.data.getTime()===diaSel.getTime())) || null;
+  const ent=D?D.ent:0, sai=D?D.saiLoja:0, taxa=D?D.taxa:0, pend=D?D.pend:0, pes=D?D.saiPes:0;
+  const saldo = ent - taxa - pend - sai;
+  const vendas = D ? D.itens.filter(i=>i.tipo==='venda') .sort((a,b)=>b.ent-a.ent) : [];
+  const saidas = D ? D.itens.filter(i=>i.tipo!=='venda').sort((a,b)=>b.sai-a.sai) : [];
+  const nv = vendas.filter(i=>i.ent>0).length;
+
+  const card=(r,v,k,o)=>`<div class="rd-card" style="--k:${k}"><div class="r">${r}</div><div class="v">${v}</div>${o?`<div class="o">${o}</div>`:''}</div>`;
+  const desc=[]; if(taxa) desc.push('taxas '+brl(taxa)); if(pend) desc.push('não pago '+brl(pend));
+  let cards = card('Entradas do dia',brl(ent),'#1E7B34', nv+(nv===1?' venda':' vendas'))
+            + card('Saídas da loja',brl(sai),'#C0392B', saidas.filter(i=>!i.prolab).length+' lançamento(s)')
+            + card('Saldo do dia',brl(saldo), saldo>=0?'#0F9D8B':'#C0392B', desc.length?'descontados '+desc.join(' e '):'entradas − saídas');
+  if(pend) cards += card('A receber do dia',brl(pend),'#B7791F','aguardando pagamento');
+
+  /* formas de pagamento das vendas do dia */
+  const fp={}; vendas.forEach(v=>{ if(v.ent>0){ const k=v.pend?'Aguardando Pagamento':(v.forma||'não informado'); fp[k]=(fp[k]||0)+v.ent; } });
+  const linhaFp = Object.entries(fp).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<b>${esc(k)}</b> ${brl(v)}`).join(' &nbsp;·&nbsp; ');
+
+  const tabVendas = vendas.length ? `<table><thead><tr><th>Cliente</th><th>Produto</th><th>Pagamento</th><th class="n">Taxa</th><th class="n">Valor</th></tr></thead>
+    <tbody>${vendas.map(i=>`<tr><td>${esc(i.nome)}</td><td>${esc(i.produto||'—')}</td>
+      <td class="${i.pend?'pend':''}">${i.pend?'Aguardando Pagamento':esc(i.forma||'—')}</td>
+      <td class="n">${i.taxa?brl(i.taxa):'—'}</td><td class="n ent">${brl(i.ent)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">Total de entradas — ${vendas.length} ${vendas.length===1?'lançamento':'lançamentos'}</td>
+      <td class="n">${taxa?brl(taxa):'—'}</td><td class="n">${brl(ent)}</td></tr></tfoot></table>
+    ${linhaFp?`<div class="rd-fp">Por forma de pagamento: ${linhaFp}</div>`:''}`
+    : '<div class="rd-vazio">Nenhuma venda neste dia.</div>';
+
+  const tabSaidas = saidas.length ? `<table><thead><tr><th>Descrição</th><th>Categoria</th><th>Observação</th><th class="n">Valor</th></tr></thead>
+    <tbody>${saidas.map(i=>`<tr><td>${esc(i.nome)}</td><td>${esc(i.cat||'—')}${i.prolab?' <i>(pessoal)</i>':''}</td>
+      <td>${esc((i.obs||'').slice(0,90))}${(i.obs||'').length>90?'…':''}</td><td class="n sai">${brl(i.sai)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">Total de saídas${pes?' (loja '+brl(sai)+' + pessoal '+brl(pes)+')':''}</td><td class="n">${brl(sai+pes)}</td></tr></tfoot></table>`
+    : '<div class="rd-vazio">Nenhuma saída neste dia.</div>';
+
+  const R = mesAte(m, diaSel);
+  const nomeMes = m ? m.nome : NOMES[diaSel.getMonth()];
+  const cardsMes = card('Faturamento',brl(R.fat),'#0F9D8B','sem taxas e sem o que não foi pago')
+    + card('Despesas da loja',brl(R.desp),'#C0392B','sem pró-labore')
+    + card('Saldo do mês',brl(R.saldo), R.saldo>=0?'#1E7B34':'#C0392B', R.nVendas+' vendas · ticket '+brl(R.ticket))
+    + card('A receber',brl(R.receber),'#B7791F','vendas ainda não pagas');
+
+  const dataTxt = porExtenso(diaSel);
+  $('relDia').innerHTML = `
+    <div class="rd-cab"><div><h1>Relatório Diário — Planeta Água</h1>
+      <p class="rd-sub">${dataTxt.charAt(0).toUpperCase()+dataTxt.slice(1)}</p></div>
+      <div class="rd-emit">emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div></div>
+    <h2>Movimento do dia</h2>
+    <div class="rd-cards">${cards}</div>
+    <h2>Entradas (vendas)</h2>${tabVendas}
+    <h2>Saídas</h2>${tabSaidas}
+    <h2>${esc(nomeMes)} até dia ${String(diaSel.getDate()).padStart(2,'0')}</h2>
+    <div class="rd-cards">${cardsMes}</div>
+    ${R.giro?`<div class="rd-nota">Capital de giro a devolver no mês (${brl(R.giro)}) já está fora das despesas.</div>`:''}`;
+}
+function pdfDoDia(){
+  relatorioDia();
+  const tit=document.title;
+  document.title='Relatorio_Diario_'+String(diaSel.getDate()).padStart(2,'0')+'-'+String(diaSel.getMonth()+1).padStart(2,'0')+'-'+diaSel.getFullYear();
+  window.print();
+  setTimeout(()=>{ document.title=tit; },800);
 }
 
 /* ================= ABA MÊS ================= */
@@ -1872,5 +1973,6 @@ function anual(){
     <div class="nota">Alíquota é estimativa da planilha — confirme com o contador. O imposto efetivamente pago aparece na categoria "Impostos e Taxas".</div>`;
 }
 </script>
+<div id="relDia"></div>
 </body>
 </html>
