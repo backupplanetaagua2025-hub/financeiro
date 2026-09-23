@@ -665,6 +665,7 @@ const NOMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Ag
 const SEM = ["domingo","segunda","terça","quarta","quinta","sexta","sábado"];
 const PRO_LABORE = "Pro Labore Edilânia";
 const PENDENTE = "Aguardando Pagamento";
+const CAT_SAL = "Salários, Comissões e Encargos"; /* comissões saem daqui e vão para custo variável */
 
 /* Classificação usada no DRE da planilha */
 const CAT_VAR = ["Fornecedores / Mercadoria","Impostos e Taxas","Transporte e Entregas"];
@@ -1065,7 +1066,7 @@ function processar(buf){
   DADOS = MESES.map((sig,mi)=>{
     const L = linhas(sig+' 2026');
     const base = {mes:mi, nome:NOMES[mi], itens:[], fat:0, desp:0, saldo:0, receber:0, prolab:0,
-                  novo:false, temDados:false, catTot:{}, estac:0, custoVar:0, custoFix:0,
+                  novo:false, temDados:false, catTot:{}, estac:0, com:0, custoVar:0, custoFix:0,
                   mc:0, mcPct:0, resultado:0, margemLiq:0, nVendas:0, ticket:0, dias:[], prods:[], clientes:[]};
     if(!L) return base;
     const cab = L[3]||[];
@@ -1096,9 +1097,11 @@ function processar(buf){
       if(sai>0 && cat) base.catTot[cat]=(base.catTot[cat]||0)+sai;
       const ehEstac = sai>0 && norm(cat)==='transporte e entregas' && norm(nome).startsWith('estacionamento');
       if(ehEstac) base.estac+=sai;
+      const ehCom = sai>0 && norm(cat)===norm(CAT_SAL) && (novo ? norm(nome).startsWith('comissao') : norm(nome+' '+prod).includes('comiss'));
+      if(ehCom) base.com+=sai;
 
       const it = {data:d, nome, produto:novo?prod:'', pessoa:novo?'':prod, obs,
-        ent, sai, cat, forma, taxa, pend, prolab:pl, estac:ehEstac,
+        ent, sai, cat, forma, taxa, pend, prolab:pl, estac:ehEstac, com:ehCom,
         tipo: ent>0||(!sai&&ent===0&&prod) ? 'venda' : 'despesa'};
       base.itens.push(it);
     }
@@ -1116,8 +1119,8 @@ function processar(buf){
 
     /* competência (igual ao DRE da planilha) */
     const g=c=>base.catTot[c]||0;
-    base.custoVar = g("Fornecedores / Mercadoria") + g("Impostos e Taxas") + (g("Transporte e Entregas") - base.estac);
-    base.custoFix = CAT_FIX.reduce((s,c)=>s+g(c),0) + base.estac;
+    base.custoVar = g("Fornecedores / Mercadoria") + g("Impostos e Taxas") + (g("Transporte e Entregas") - base.estac) + base.com;
+    base.custoFix = CAT_FIX.reduce((s,c)=>s+g(c),0) + base.estac - base.com;
     base.mc = base.fat - base.custoVar;
     base.mcPct = base.fat>0 ? base.mc/base.fat : 0;
     base.resultado = base.mc - base.custoFix;
@@ -1192,7 +1195,7 @@ function agregarAno(){
   /* categorias somadas no ano */
   ANO.catTot={};
   ms.forEach(m=>{ for(const c in m.catTot) ANO.catTot[c]=(ANO.catTot[c]||0)+m.catTot[c]; });
-  ANO.estac=s('estac');
+  ANO.estac=s('estac'); ANO.com=s('com');
 
   /* produtos do ano */
   const mp={};
@@ -1717,7 +1720,7 @@ function itemHTML(i){
   const etq = i.pend ? '<span class="tag pend">Aguardando pagamento</span>'
     : venda ? (i.forma?`<span class="tag">${esc(i.forma)}${i.taxa?' · taxa '+brl(i.taxa):''}</span>`:'')
     : i.prolab ? '<span class="tag pes">Pessoal (pró-labore)</span>'
-    : (CAT_VAR.includes(i.cat) && !i.estac) ? '<span class="tag var">Custo variável</span>'
+    : ((CAT_VAR.includes(i.cat) && !i.estac) || i.com) ? '<span class="tag var">Custo variável</span>'
     : i.cat ? '<span class="tag fix">Custo fixo</span>' : '';
   return `<div class="row"><div class="m">
       <div class="n">${esc(i.nome)}</div>
@@ -1833,6 +1836,7 @@ function dre(m){
     ${L('(−) Fornecedores / Mercadoria', g('Fornecedores / Mercadoria'), true)}
     ${L('(−) Impostos e Taxas', g('Impostos e Taxas'), true)}
     ${L('(−) Transporte e Entregas', g('Transporte e Entregas')-m.estac, true)}
+    ${L('(−) Comissões (Wiliam)', m.com, true)}
     ${L('(=) Margem de contribuição', m.mc, false, true)}
     <div class="kv"><span class="k">Margem de contribuição (%)</span><span class="vv">${pct(m.mcPct)}</span></div>
     ${L('(−) Custos fixos', m.custoFix, true, true)}
@@ -1895,8 +1899,9 @@ function despesas(m){
   const g=c=>m.catTot[c]||0;
   const listaVar=[['Fornecedores / Mercadoria',g('Fornecedores / Mercadoria')],
                   ['Impostos e Taxas',g('Impostos e Taxas')],
-                  ['Transporte e Entregas',g('Transporte e Entregas')-m.estac]].filter(x=>x[1]>0);
-  const listaFix=CAT_FIX.map(c=>[c,g(c)]).concat(m.estac?[['Estacionamento (mensal)',m.estac]]:[]).filter(x=>x[1]>0)
+                  ['Transporte e Entregas',g('Transporte e Entregas')-m.estac],
+                  ['Comissões (Wiliam)',m.com]].filter(x=>x[1]>0);
+  const listaFix=CAT_FIX.map(c=>c===CAT_SAL?['Salários e Encargos',g(c)-m.com]:[c,g(c)]).concat(m.estac?[['Estacionamento (mensal)',m.estac]]:[]).filter(x=>x[1]>0)
                  .sort((a,b)=>b[1]-a[1]);
   const maxV=Math.max(...listaVar.map(x=>x[1]),...listaFix.map(x=>x[1]),1);
   const linha=(nome,val,cor)=>`<div style="padding:9px 0;border-top:1px solid var(--line)">
@@ -1915,7 +1920,7 @@ function despesas(m){
     ${listaVar.length?listaVar.map(([n,v])=>linha(n,v,'var(--verde)')).join(''):'<div class="nota">Nenhum custo variável lançado.</div>'}
     <div style="margin-top:14px;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--roxo)">Fixos</div>
     ${listaFix.length?listaFix.map(([n,v])=>linha(n,v,'var(--roxo)')).join(''):'<div class="nota">Nenhum custo fixo lançado.</div>'}
-    <div class="nota"><b>Variáveis</b> sobem e descem junto com o volume vendido: mercadoria, imposto sobre o faturamento e frete ligado ao serviço.
+    <div class="nota"><b>Variáveis</b> sobem e descem junto com o volume vendido: mercadoria, imposto sobre o faturamento, frete ligado ao serviço e as comissões (só existem quando tem troca ou instalação).
       <b>Fixos</b> a loja paga mesmo vendendo pouco: aluguel, energia, salários, contabilidade, tarifas e o estacionamento contratado no mês.</div>`;
 }
 
@@ -2170,8 +2175,9 @@ function anual(){
     ['(−) Fornecedores / Mercadoria', -g('Fornecedores / Mercadoria'), -g('Fornecedores / Mercadoria')/ANO.n],
     ['(−) Impostos e Taxas', -g('Impostos e Taxas'), -g('Impostos e Taxas')/ANO.n],
     ['(−) Transporte e Entregas', -(g('Transporte e Entregas')-ANO.estac), -(g('Transporte e Entregas')-ANO.estac)/ANO.n],
+    ['(−) Comissões (Wiliam)', -ANO.com, -ANO.com/ANO.n],
     ['(=) Margem de contribuição', ANO.mc, ANO.mcMed, true],
-  ].concat(CAT_FIX.map(c=>['(−) '+c, -g(c), -g(c)/ANO.n]).filter(r=>r[1]!==0))
+  ].concat(CAT_FIX.map(c=>c===CAT_SAL?['(−) Salários e Encargos', -(g(c)-ANO.com), -(g(c)-ANO.com)/ANO.n]:['(−) '+c, -g(c), -g(c)/ANO.n]).filter(r=>r[1]!==0))
    .concat(ANO.estac?[['(−) Estacionamento', -ANO.estac, -ANO.estac/ANO.n]]:[])
    .concat([['(=) Custos fixos', -ANO.custoFix, -ANO.fixMed, true],
             ['(=) RESULTADO', ANO.resultado, ANO.resMed, true],
