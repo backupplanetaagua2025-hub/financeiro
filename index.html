@@ -175,6 +175,11 @@
   .destaque .o{font-size:12px;opacity:.88;margin-top:6px;line-height:1.5}
   .destaque .bar{background:rgba(255,255,255,.22);height:10px;margin-top:12px}
 
+  .plbox{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--roxo);border-radius:12px;padding:11px 13px;margin-top:12px}
+  .plbox.passou{border-left-color:var(--vermelho)}
+  .plbox .plt{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;font-weight:700}
+  .plbox .plt b{font-size:17px}
+  .plbox .pls{font-size:12px;margin-top:6px;color:var(--muted)}
   .aviso{padding:12px 13px;border-radius:12px;font-size:12.5px;line-height:1.5;margin-top:12px}
   .aviso.ok{background:rgba(30,123,52,.14);color:var(--verdeEsc)}
   .aviso.ruim{background:rgba(192,57,43,.13);color:var(--vermelho)}
@@ -574,7 +579,7 @@
       </section>
 
       <section>
-        <div class="sec-h" data-alvo="b-pessoal"><h2>Despesas pessoais (fora da loja)</h2><span class="cnt" id="c-pessoal"></span><span class="arw">›</span></div>
+        <div class="sec-h" data-alvo="b-pessoal"><h2>Pró-labore da Edilânia</h2><span class="cnt" id="c-pessoal"></span><span class="arw">›</span></div>
         <div class="sec-b" id="b-pessoal" hidden></div>
       </section>
 
@@ -966,7 +971,7 @@ if($('gate')){ $('entrar').onclick=tentar; $('pw').onkeydown=e=>{if(e.key==='Ent
 
 /* ---------------- leitura da planilha ---------------- */
 let pgDe='', pgAte='', pgPreset='tudo';
-let WB=null, DADOS=[], GIRO=[], GIROLIST=[], PAGAR=[], PRECOS=[], CFG={taxaCartao:.07,imposto:.06,reserva:0,mesesCob:3,aliquota:.06,vencDAS:20};
+let WB=null, DADOS=[], GIRO=[], GIROLIST=[], PAGAR=[], PRECOS=[], CFG={taxaCartao:.07,imposto:.06,reserva:0,mesesCob:3,aliquota:.06,vencDAS:20,plComb:4000};
 
 async function carregar(){
   $('carregando').hidden=false; $('app').hidden=true; $('tabs').hidden=true;
@@ -1062,6 +1067,10 @@ function processar(buf){
     CFG.vencDAS  = num((ri[20]||[])[1]) || 20;
   }
 
+  /* ---- pró-labore combinado da Edilânia (Ponto de Equilíbrio!B10) ---- */
+  const peq = linhas('Ponto de Equilíbrio');
+  if(peq){ const v=num((peq[9]||[])[1]); if(v>0) CFG.plComb=v; }
+
   /* ---- meses ---- */
   DADOS = MESES.map((sig,mi)=>{
     const L = linhas(sig+' 2026');
@@ -1116,6 +1125,7 @@ function processar(buf){
     base.desp = Math.max(0, brutas - giro);
     base.giro = giro;
     base.saldo= base.fat - base.desp;
+    base.saldoFinal = base.saldo - prolab;          /* caixa depois do pró-labore */
 
     /* competência (igual ao DRE da planilha) */
     const g=c=>base.catTot[c]||0;
@@ -1125,6 +1135,7 @@ function processar(buf){
     base.mcPct = base.fat>0 ? base.mc/base.fat : 0;
     base.resultado = base.mc - base.custoFix;
     base.margemLiq = base.fat>0 ? base.resultado/base.fat : 0;
+    base.resultadoFinal = base.resultado - prolab;  /* competência depois do pró-labore */
 
     /* vendas / ticket */
     const vendas = base.itens.filter(i=>i.tipo==='venda' && i.ent>0);
@@ -1180,17 +1191,26 @@ function agregarAno(){
   const ms=DADOS.filter(m=>m.temDados);
   const s=k=>ms.reduce((a,m)=>a+(m[k]||0),0);
   ANO.meses=ms;
-  /* média divide só pelos meses que tiveram faturamento — mesmo critério da planilha (B3 do DRE) */
-  ANO.n=ms.filter(m=>m.fat>0).length||1;
+  /* médias: só meses JÁ FECHADOS e com faturamento — o mês em andamento fica fora até terminar
+     (mesmo critério da linha 38 / célula B3 do DRE na planilha) */
+  const hj=new Date(), limMes = hj.getFullYear()>2026 ? 12 : hj.getMonth();
+  const mf=ms.filter(m=>m.fat>0 && m.mes<limMes);
+  ANO.fechados=mf; ANO.n=mf.length||1;
+  const sf=k=>mf.reduce((a,m)=>a+(m[k]||0),0);
   ANO.fat=s('fat'); ANO.custoVar=s('custoVar'); ANO.custoFix=s('custoFix');
-  ANO.mc=ANO.fat-ANO.custoVar; ANO.mcPct=ANO.fat>0?ANO.mc/ANO.fat:0;
+  ANO.mc=ANO.fat-ANO.custoVar;
   ANO.resultado=ANO.mc-ANO.custoFix; ANO.margemLiq=ANO.fat>0?ANO.resultado/ANO.fat:0;
   ANO.prolab=s('prolab'); ANO.receber=s('receber'); ANO.desp=s('desp'); ANO.saldo=s('saldo');
+  ANO.resultadoFinal=ANO.resultado-ANO.prolab; ANO.saldoFinal=ANO.saldo-ANO.prolab;
   ANO.taxas=s('taxas'); ANO.nVendas=s('nVendas');
-  ANO.fatMed=ANO.fat/ANO.n; ANO.varMed=ANO.custoVar/ANO.n; ANO.fixMed=ANO.custoFix/ANO.n;
-  ANO.mcMed=ANO.mc/ANO.n; ANO.resMed=ANO.resultado/ANO.n;
+  ANO.fatMed=sf('fat')/ANO.n; ANO.varMed=sf('custoVar')/ANO.n; ANO.fixMed=sf('custoFix')/ANO.n;
+  ANO.mcMed=ANO.fatMed-ANO.varMed; ANO.mcPct=ANO.fatMed>0?ANO.mcMed/ANO.fatMed:0;
+  ANO.resMed=ANO.mcMed-ANO.fixMed; ANO.plMed=sf('prolab')/ANO.n;
   ANO.ticket = ANO.nVendas ? ms.reduce((a,m)=>a+m.ticket*m.nVendas,0)/ANO.nVendas : 0;
-  ANO.pe = ANO.mcPct>0 ? ANO.fixMed/ANO.mcPct : 0;
+  /* ponto de equilíbrio já pagando o pró-labore combinado da Edilânia */
+  ANO.fixTot = ANO.fixMed + CFG.plComb;
+  ANO.pe = ANO.mcPct>0 ? ANO.fixTot/ANO.mcPct : 0;
+  ANO.sobraMed = ANO.resMed - CFG.plComb;
 
   /* categorias somadas no ano */
   ANO.catTot={};
@@ -1269,6 +1289,24 @@ function render(){
 }
 
 
+/* ================= PRÓ-LABORE DA EDILÂNIA =================
+   Tudo o que ela gasta do dinheiro da loja (categoria "Pro Labore Edilânia") é o pró-labore dela.
+   O combinado por mês vem da planilha (Ponto de Equilíbrio!B10) — R$ 4.000,00 desde 05/10/2026. */
+function mesFechou(mi){ const h=new Date(); return h.getFullYear()>2026 || h.getMonth()>mi; }
+function plSituacao(gasto, mi){
+  const comb=CFG.plComb, dif=comb-gasto;
+  if(dif<0) return {txt:'passou '+brl(-dif)+' do combinado', cor:'var(--vermelho)', ok:false};
+  if(mi!=null && mesFechou(mi)) return {txt:'ficou '+brl(dif)+' abaixo do combinado', cor:'var(--verdeEsc)', ok:true};
+  return {txt:'ainda pode gastar '+brl(dif), cor:'var(--verdeEsc)', ok:true};
+}
+function plBloco(gasto, mi, titulo){
+  const comb=CFG.plComb, st=plSituacao(gasto, mi), p=comb>0?Math.min(1,gasto/comb):0;
+  return `<div class="plbox${st.ok?'':' passou'}">
+    <div class="plt"><span>${titulo||'Pró-labore da Edilânia'}</span><b style="color:${st.ok?'var(--roxo)':'var(--vermelho)'}">${brl(gasto)}</b></div>
+    <div class="bar"><i style="width:${(p*100).toFixed(1)}%;background:${st.ok?'var(--roxo)':'var(--vermelho)'}"></i></div>
+    <div class="pls">de ${brl(comb)} combinados · <b style="color:${st.cor}">${st.txt}</b></div></div>`;
+}
+
 /* ================= ABA HOJE ================= */
 let diaSel = meiaNoite(new Date());
 
@@ -1344,7 +1382,7 @@ function telaDia(){
      o: desc.length ? 'entradas menos '+desc.join(' e ')+', menos as saídas' : 'entradas menos saídas do dia'}
   ];
   if(pend) cs.push({r:'A receber do dia', v:pend, c:'var(--ambar)', o:'vendas aguardando pagamento'});
-  if(pes)  cs.push({r:'Pessoal (pró-labore)', v:pes, c:'var(--roxo)', o:'fora das despesas da loja'});
+  if(pes)  cs.push({r:'Pró-labore Edilânia', v:pes, c:'var(--roxo)', o:'gastos dela pagos pela loja no dia'});
   $('cards-dia').innerHTML = cs.map(c=>`<div class="card${c.w?' wide':''}" style="--c:${c.c}">
       <div class="rot">${c.r}</div><div class="val" style="color:${c.c}">${brl(c.v)}</div>
       <div class="obs">${c.o}</div></div>`).join('');
@@ -1384,17 +1422,20 @@ function telaDia(){
   const R = mesAte(m, diaSel);
   const nomeMes = m ? m.nome : NOMES[diaSel.getMonth()];
   $('h-diames').textContent = 'Em '+nomeMes+' até dia '+String(diaSel.getDate()).padStart(2,'0');
-  $('c-diames').textContent = brl(R.saldo);
+  $('c-diames').textContent = brl(R.saldo-R.prolab);
   const kv = [
     ['Faturamento', brl(R.fat), 'var(--verde)'],
     ['Despesas da loja', brl(R.desp), 'var(--vermelho)'],
-    ['Saldo até aqui', brl(R.saldo), R.saldo>=0?'var(--verdeEsc)':'var(--vermelho)'],
+    ['Saldo da loja até aqui', brl(R.saldo), R.saldo>=0?'var(--verdeEsc)':'var(--vermelho)'],
+    ['Pró-labore Edilânia até aqui', brl(R.prolab), 'var(--roxo)'],
+    ['Sobra final até aqui', brl(R.saldo-R.prolab), (R.saldo-R.prolab)>=0?'var(--verdeEsc)':'var(--vermelho)'],
     ['A receber', brl(R.receber), 'var(--ambar)'],
     ['Vendas', R.nVendas+(R.nVendas===1?' venda':' vendas'), 'var(--ink)'],
     ['Ticket médio', brl(R.ticket), 'var(--ink)']
   ];
   $('b-diames').innerHTML = kv.map(([k,v,c])=>
     `<div class="kv"><div class="k">${k}</div><div class="vv" style="color:${c}">${v}</div></div>`).join('')
+    + (m ? plBloco(R.prolab, m.mes, 'Pró-labore da Edilânia no mês') : '')
     + (R.giro ? `<div class="nota">Capital de giro a devolver no mês (${brl(R.giro)}) já está fora das despesas.</div>` : '');
 
   /* dia a dia do mês, com o dia escolhido em destaque */
@@ -1478,7 +1519,9 @@ function relatorioDia(dia, comLista){
   const cardsMes = rdCard('Faturamento',brl(R.fat),'#0F9D8B','sem taxas e sem o que não foi pago')
     + rdCard('Despesas da loja',brl(R.desp),'#C0392B','sem pró-labore')
     + rdCard('Saldo do mês',brl(R.saldo), R.saldo>=0?'#1E7B34':'#C0392B', R.nVendas+' vendas · ticket '+brl(R.ticket))
-    + rdCard('A receber',brl(R.receber),'#B7791F','vendas ainda não pagas');
+    + rdCard('A receber',brl(R.receber),'#B7791F','vendas ainda não pagas')
+    + rdCard('Pró-labore Edilânia',brl(R.prolab),'#6B4FA0','de '+brl(CFG.plComb)+' combinados · '+plSituacao(R.prolab, dia.getMonth()).txt)
+    + rdCard('Sobra final do mês',brl(R.saldo-R.prolab),(R.saldo-R.prolab)>=0?'#1E7B34':'#C0392B','saldo − pró-labore');
 
   const txt = porExtenso(dia);
   $('relPdf').innerHTML = rdCab('Relatório Diário — Planeta Água', txt.charAt(0).toUpperCase()+txt.slice(1)) + `
@@ -1512,9 +1555,9 @@ function tabelaSaidas(saidas, comData, comLista, sai, pes){
   if(!saidas.length) return '<h2>Saídas</h2><div class="rd-vazio">Nenhuma saída no período.</div>';
   if(!comLista) return '';
   return `<h2>Saídas</h2><table><thead><tr>${comData?'<th>Data</th>':''}<th>Descrição</th><th>Categoria</th><th>Observação</th><th class="n">Valor</th></tr></thead>
-    <tbody>${saidas.map(i=>`<tr>${comData?`<td>${ddmm(i.data)}</td>`:''}<td>${esc(i.nome)}</td><td>${esc(i.cat||'—')}${i.prolab?' <i>(pessoal)</i>':''}</td>
+    <tbody>${saidas.map(i=>`<tr>${comData?`<td>${ddmm(i.data)}</td>`:''}<td>${esc(i.nome)}</td><td>${esc(i.cat||'—')}${i.prolab?' <i>(Edilânia)</i>':''}</td>
       <td>${esc((i.obs||'').slice(0,80))}${(i.obs||'').length>80?'…':''}</td><td class="n sai">${brl(i.sai)}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="${comData?4:3}">Total de saídas${pes?' (loja '+brl(sai)+' + pessoal '+brl(pes)+')':''}</td><td class="n">${brl(sai+pes)}</td></tr></tfoot></table>`;
+    <tfoot><tr><td colspan="${comData?4:3}">Total de saídas${pes?' (loja '+brl(sai)+' + Edilânia '+brl(pes)+')':''}</td><td class="n">${brl(sai+pes)}</td></tr></tfoot></table>`;
 }
 
 /* ---------- relatório de um PERÍODO (pode atravessar meses) ---------- */
@@ -1539,7 +1582,8 @@ function relatorioPeriodo(de, ate, comLista){
     + rdCard('Despesas da loja',brl(desp),'#C0392B', giro?'sem capital de giro a devolver ('+brl(giro)+')':'sem pró-labore')
     + rdCard('Saldo do período',brl(saldo), saldo>=0?'#1E7B34':'#C0392B','faturamento − despesas')
     + rdCard('A receber',brl(pend),'#B7791F','vendas do período ainda não pagas')
-    + rdCard('Pessoal (pró-labore)',brl(pes),'#6B4FA0','fora das despesas da loja');
+    + rdCard('Pró-labore Edilânia',brl(pes),'#6B4FA0','gastos dela pagos pela loja')
+    + rdCard('Sobra final',brl(saldo-pes),(saldo-pes)>=0?'#1E7B34':'#C0392B','saldo − pró-labore');
 
   /* dia a dia — ou mês a mês, se o período for longo */
   const porMes = nDias>62;
@@ -1565,7 +1609,7 @@ function relatorioPeriodo(de, ate, comLista){
   const tabCat = cl.length ? `<table><thead><tr><th>Categoria</th><th class="n">Valor</th><th class="n">%</th></tr></thead>
     <tbody>${cl.map(([c,v])=>`<tr><td>${esc(c)}</td><td class="n sai">${brl(v)}</td><td class="n">${pct(v/brutas)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Total da loja</td><td class="n">${brl(brutas)}</td><td class="n">100%</td></tr></tfoot></table>
-    ${pes?`<div class="rd-nota">Fora da loja: ${brl(pes)} em despesas pessoais (pró-labore).</div>`:''}` : '<div class="rd-vazio">Nenhuma despesa no período.</div>';
+    ${pes?`<div class="rd-nota">Pró-labore da Edilânia no período: ${brl(pes)} (fora desta tabela, descontado na sobra final).</div>`:''}` : '<div class="rd-vazio">Nenhuma despesa no período.</div>';
 
   /* produtos mais vendidos no período */
   const pr={}; vendas.forEach(v=>{ if(v.ent>0 && v.produto){ const k=v.produto; if(!pr[k]) pr[k]={n:0,v:0}; pr[k].n++; pr[k].v+=v.ent; } });
@@ -1665,8 +1709,13 @@ function cardsMes(m){
   const cs=[
     {r:'Faturamento',v:m.fat,c:'var(--verde)',o: m.novo? 'já sem taxas de máquina e sem o que não foi pago' : 'entradas do mês'},
     {r:'Despesas da loja',v:m.desp,c:'var(--vermelho)',o: m.giro? 'sem capital de giro a devolver ('+brl(m.giro)+')' : 'saídas da loja (sem pró-labore)'},
-    {r:'Saldo do mês',v:m.saldo,c: m.saldo>=0?'var(--verdeEsc)':'var(--vermelho)',o:'faturamento − despesas (dinheiro que entrou e saiu)',w:true},
+    {r:'Saldo antes da Edilânia',v:m.saldo,c: m.saldo>=0?'var(--verdeEsc)':'var(--vermelho)',o:'faturamento − despesas da loja'},
   ];
+  const st=plSituacao(m.prolab, m.mes);
+  cs.push({r:'Pró-labore Edilânia',v:m.prolab,c: st.ok?'var(--roxo)':'var(--vermelho)',
+           o:'de '+brl(CFG.plComb)+' combinados · '+st.txt});
+  cs.push({r:'Sobra final do mês',v:m.saldoFinal,c: m.saldoFinal>=0?'var(--verdeEsc)':'var(--vermelho)',
+           o:'saldo da loja − pró-labore da Edilânia (o que sobrou de verdade)',w:true});
   if(m.novo) cs.push({r:'A receber',v:m.receber,c:'var(--ambar)',o:'vendas aguardando pagamento'});
   cs.push({r:'Vendas',v:null,txt:m.nVendas+(m.nVendas===1?' venda':' vendas'),c:'var(--azul)',
            o:'ticket médio '+brl(m.ticket)});
@@ -1690,7 +1739,7 @@ function dias(m){
     if(d.fat) det.push('entrou '+brl(d.fat));
     if(d.saiLoja) det.push('saiu '+brl(d.saiLoja));
     if(d.pend) det.push('a receber '+brl(d.pend));
-    if(d.saiPes) det.push('pessoal '+brl(d.saiPes));
+    if(d.saiPes) det.push('Edilânia '+brl(d.saiPes));
     return `<div class="dia">
       <div class="dia-h" data-dia="${k}">
         <div class="dd">${String(d.data.getDate()).padStart(2,'0')}/${String(d.data.getMonth()+1).padStart(2,'0')}</div>
@@ -1719,7 +1768,7 @@ function itemHTML(i){
   const venda=i.tipo==='venda';
   const etq = i.pend ? '<span class="tag pend">Aguardando pagamento</span>'
     : venda ? (i.forma?`<span class="tag">${esc(i.forma)}${i.taxa?' · taxa '+brl(i.taxa):''}</span>`:'')
-    : i.prolab ? '<span class="tag pes">Pessoal (pró-labore)</span>'
+    : i.prolab ? '<span class="tag pes">Pró-labore Edilânia</span>'
     : ((CAT_VAR.includes(i.cat) && !i.estac) || i.com) ? '<span class="tag var">Custo variável</span>'
     : i.cat ? '<span class="tag fix">Custo fixo</span>' : '';
   return `<div class="row"><div class="m">
@@ -1749,7 +1798,7 @@ function lancamentos(m){
       <input type="search" id="q" placeholder="Buscar cliente ou produto" value="${esc(busca)}">
     </div>
     <div class="chips">
-      ${[['tudo','Tudo'],['venda','Vendas'],['despesa','Despesas'],['pend','Pendentes'],['pessoal','Pessoais']]
+      ${[['tudo','Tudo'],['venda','Vendas'],['despesa','Despesas'],['pend','Pendentes'],['pessoal','Pró-labore']]
         .map(([k,t])=>`<span class="chip${filtro===k?' on':''}" data-f="${k}">${t}</span>`).join('')}
     </div><div id="lista"></div>`;
   $('q').oninput=e=>{busca=e.target.value; lista();};
@@ -1779,20 +1828,21 @@ function lista(){
 /* ================= ABA RESULTADO ================= */
 function equilibrio(m){
   const peAno = ANO.pe;
-  const peMes = m.mcPct>0 ? m.custoFix/m.mcPct : 0;
+  const peMes = m.mcPct>0 ? (m.custoFix+CFG.plComb)/m.mcPct : 0;
   const prog = peAno>0 ? Math.min(1, m.fat/peAno) : 0;
   const falta = Math.max(0, peAno-m.fat);
   const dias = new Date(2026,m.mes+1,0).getDate();
 
   const av = ANO.mcPct<=0
     ? `<div class="aviso ruim">⚠ A margem de contribuição está zerada ou negativa: os custos variáveis (mercadoria, imposto, frete) consomem tudo que entra. Enquanto isso não mudar, não existe ponto de equilíbrio possível — é preciso mexer em preço ou custo de compra.</div>`
-    : `<div class="aviso ok">✔ Cada R$ 100,00 vendidos deixam <b>${brl(ANO.mcPct*100)}</b> para pagar os custos fixos e virar lucro.</div>`;
+    : `<div class="aviso ok">✔ Cada R$ 100,00 vendidos deixam <b>${brl(ANO.mcPct*100)}</b> para pagar os custos fixos, o pró-labore e virar lucro.</div>`;
 
   $('pe-box').innerHTML = `
     <div class="destaque">
       <div class="r">Ponto de equilíbrio — média 2026</div>
       <div class="v">${brl(peAno)}</div>
-      <div class="o">É o quanto a loja precisa faturar por mês só para não ter prejuízo.
+      <div class="o">É o quanto a loja precisa faturar por mês para pagar todas as contas <b>e</b> os ${brl(CFG.plComb)} da Edilânia sem ter prejuízo
+        (custos fixos de ${brl(ANO.fixMed)} + pró-labore de ${brl(CFG.plComb)}).
         Dá cerca de <b>${brl(peAno/26)}</b> por dia útil${ANO.ticket?` ou <b>${Math.ceil(peAno/ANO.ticket)} vendas</b> no mês (ticket médio ${brl(ANO.ticket)})`:''}.</div>
       <div class="bar"><i style="width:${(prog*100).toFixed(1)}%;background:${m.fat>=peAno?'var(--verdeEsc)':'var(--ambar)'}"></i></div>
       <div class="o">${NOMES[m.mes]}: faturou ${brl(m.fat)} —
@@ -1802,7 +1852,7 @@ function equilibrio(m){
     <div class="cards" style="margin-top:14px">
       <div class="card" style="--c:var(--roxo)"><div class="rot">Equilíbrio de ${MESES[m.mes]}</div>
         <div class="val" style="color:var(--roxo)">${peMes?brl(peMes):'—'}</div>
-        <div class="obs">calculado só com os custos fixos e a margem deste mês (${dias} dias)</div></div>
+        <div class="obs">com os custos fixos e a margem deste mês (${dias} dias) + o pró-labore combinado</div></div>
       <div class="card" style="--c:var(--azul)"><div class="rot">Margem de contribuição</div>
         <div class="val" style="color:var(--azul)">${pct(m.mcPct)}</div>
         <div class="obs">${brl(m.mc)} sobraram das vendas depois dos custos variáveis</div></div>
@@ -1810,17 +1860,17 @@ function equilibrio(m){
 }
 
 function metas(m){
-  const mcp = ANO.mcPct, fix = ANO.fixMed, tk = ANO.ticket || 140;
+  const mcp = ANO.mcPct, fix = ANO.fixTot, tk = ANO.ticket || 140;
   const alvos=[0,500,1000,2000,3000,5000];
   if(mcp<=0){ $('b-meta').innerHTML='<div class="empty">Sem margem de contribuição positiva, não dá para calcular metas.</div>'; return; }
   $('b-meta').innerHTML = `<div class="scroll"><table class="tb">
     <tr><th>Objetivo</th><th>Faturar</th><th>Vendas</th><th>Por dia útil</th></tr>
     ${alvos.map(a=>{
       const f=(fix+a)/mcp, n=Math.ceil(f/tk);
-      return `<tr><td>${a?'Lucrar '+brl0(a):'Não ter prejuízo'}</td><td>${brl0(f)}</td><td>${n}</td><td>${(n/26).toFixed(1)}</td></tr>`;
+      return `<tr><td>${a?'Lucrar '+brl0(a):'Pagar tudo e a Edilânia'}</td><td>${brl0(f)}</td><td>${n}</td><td>${(n/26).toFixed(1)}</td></tr>`;
     }).join('')}
   </table></div>
-  <div class="nota">Base: custo fixo médio de ${brl(fix)}/mês, margem de contribuição de ${pct(mcp)} e ticket médio de ${brl(tk)}.
+  <div class="nota">"Lucrar" aqui é o que sobra <b>depois</b> de pagar a Edilânia. Base: custo fixo médio de ${brl(ANO.fixMed)}/mês + pró-labore combinado de ${brl(CFG.plComb)}, margem de contribuição de ${pct(mcp)} e ticket médio de ${brl(tk)}.
   "Por dia útil" considera 26 dias de loja aberta no mês.</div>`;
 }
 
@@ -1840,22 +1890,28 @@ function dre(m){
     ${L('(=) Margem de contribuição', m.mc, false, true)}
     <div class="kv"><span class="k">Margem de contribuição (%)</span><span class="vv">${pct(m.mcPct)}</span></div>
     ${L('(−) Custos fixos', m.custoFix, true, true)}
-    ${L('(=) Resultado do mês', m.resultado, false, true)}
-    <div class="kv"><span class="k">Margem líquida (%)</span>
+    ${L('(=) Resultado da loja (antes da Edilânia)', m.resultado, false, true)}
+    <div class="kv"><span class="k">Margem da loja (%)</span>
       <span class="vv" style="color:${m.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}">${pct(m.margemLiq)}</span></div>
+    ${L('(−) Pró-labore Edilânia', m.prolab, true)}
+    ${L('(=) Sobra final do mês', m.resultadoFinal, false, true)}
+    ${plBloco(m.prolab, m.mes)}
     <div class="nota">Este resultado é por <b>competência</b>: conta a despesa no mês em que ela aconteceu, mesmo que tenha sido paga com o Capital de Giro do BB.
     Por isso ele costuma ser menor que o cartão "Saldo do mês", que é dinheiro puro.</div>`;
 }
 
 function indicadores(m){
-  const cob = ANO.fixMed>0 ? CFG.reserva/ANO.fixMed : 0;
+  const cob = ANO.fixTot>0 ? CFG.reserva/ANO.fixTot : 0;
   const linhas=[
     ['Faturamento médio por mês (2026)', brl(ANO.fatMed)],
     ['Custo variável médio por mês', brl(ANO.varMed)],
     ['Custo fixo médio por mês', brl(ANO.fixMed)],
     ['Margem de contribuição média', pct(ANO.mcPct)],
     ['Margem líquida média', pct(ANO.margemLiq)],
-    ['Resultado médio por mês', brl(ANO.resMed)],
+    ['Resultado médio da loja por mês (antes da Edilânia)', brl(ANO.resMed)],
+    ['Pró-labore combinado da Edilânia', brl(CFG.plComb)+' por mês'],
+    ['Pró-labore que ela gastou, em média', brl(ANO.plMed)+' por mês'],
+    ['Sobra média depois do pró-labore combinado', brl(ANO.sobraMed)],
     ['Ticket médio (ano)', brl(ANO.ticket)],
     ['Ticket médio de '+NOMES[m.mes], brl(m.ticket)],
     ['Vendas no mês', String(m.nVendas)],
@@ -1865,10 +1921,10 @@ function indicadores(m){
     ['Peso da mercadoria no faturamento', pct(m.fat>0?(m.catTot['Fornecedores / Mercadoria']||0)/m.fat:0)],
     ['Taxas de máquina no mês', brl(m.taxas)+(m.entradasBrutas?' ('+pct(m.taxas/m.entradasBrutas)+' do que entrou)':'')],
     ['Reserva de emergência guardada', brl(CFG.reserva)],
-    ['Meses de custo fixo que a reserva cobre', cob?cob.toFixed(1)+' meses':'—'],
+    ['Meses de custo fixo + pró-labore que a reserva cobre', cob?cob.toFixed(1)+' meses':'—'],
   ];
   $('b-ind').innerHTML = linhas.map(([k,v])=>`<div class="kv"><span class="k">${k}</span><span class="vv">${v}</span></div>`).join('')
-    + `<div class="nota">As médias usam apenas os ${ANO.n} meses que já tiveram movimento em 2026 — meses ainda vazios não puxam o número para baixo.</div>`;
+    + `<div class="nota">As médias usam apenas os ${ANO.n} meses já fechados de 2026 — o mês em andamento só entra quando terminar, para não puxar o número para baixo.</div>`;
 }
 
 function caixaComp(m){
@@ -1876,6 +1932,7 @@ function caixaComp(m){
     <div class="kv"><span class="k">Saldo do mês (caixa)</span><span class="vv" style="color:${m.saldo>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(m.saldo)}</span></div>
     <div class="kv"><span class="k">Resultado do mês (competência)</span><span class="vv" style="color:${m.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(m.resultado)}</span></div>
     <div class="kv"><span class="k">Diferença</span><span class="vv">${brl(m.saldo-m.resultado)}</span></div>
+    <div class="kv"><span class="k">Pró-labore Edilânia (sai dos dois)</span><span class="vv" style="color:var(--roxo)">${brl(m.prolab)}</span></div>
     <div class="nota">
       <b>Caixa</b> = dinheiro que realmente entrou e saiu no mês. É ele que diz se tem dinheiro na mão.<br>
       <b>Competência</b> = todas as despesas do mês, mesmo as que foram pagas com o Capital de Giro do BB (${brl(m.giro)} neste mês) e portanto ainda serão devolvidas. É ele que diz se o negócio dá lucro.<br>
@@ -1894,7 +1951,7 @@ function despesas(m){
       <div class="obs">${pct(totLoja?totFix/totLoja:0)} das despesas · a loja paga mesmo parada</div></div>
     <div class="card wide" style="--c:var(--vermelho)"><div class="rot">Total gasto no mês</div>
       <div class="val" style="color:var(--vermelho)">${brl(totLoja+pes)}</div>
-      <div class="obs">${brl(totLoja)} da loja + ${brl(pes)} pessoais (pró-labore)</div></div>`;
+      <div class="obs">${brl(totLoja)} da loja + ${brl(pes)} de pró-labore da Edilânia</div></div>`;
 
   const g=c=>m.catTot[c]||0;
   const listaVar=[['Fornecedores / Mercadoria',g('Fornecedores / Mercadoria')],
@@ -1926,12 +1983,14 @@ function despesas(m){
 
 function pessoais(m){
   const it=m.itens.filter(i=>i.prolab);
-  $('c-pessoal').textContent = it.length? brl(m.prolab) : 'nenhuma';
-  $('b-pessoal').innerHTML = it.length
+  $('c-pessoal').textContent = brl(m.prolab)+' de '+brl0(CFG.plComb);
+  const nota = `<div class="nota">Tudo o que a Edilânia gasta do dinheiro da loja (contas da casa, Pix pessoais, mercado, diarista...) é o pró-labore dela —
+      categoria "${PRO_LABORE}" na planilha. O combinado é <b>${brl(CFG.plComb)} por mês</b>. Ele já entra no ponto de equilíbrio
+      e é descontado da <b>sobra final</b> do mês. No ano ela gastou ${brl(ANO.prolab)}.</div>`;
+  $('b-pessoal').innerHTML = plBloco(m.prolab, m.mes, 'Gasto em '+NOMES[m.mes]) + (it.length
     ? it.sort((a,b)=>b.sai-a.sai).map(itemHTML).join('')
-      + `<div class="tot"><span>Total pessoal em ${NOMES[m.mes]}</span><span style="color:var(--vermelho)">${brl(m.prolab)}</span></div>`
-      + `<div class="nota">São retiradas dos sócios e contas particulares pagas pela conta da loja (categoria "${PRO_LABORE}"). <b>Não entram</b> no resultado da loja nem no ponto de equilíbrio — mas saem do caixa. No ano: ${brl(ANO.prolab)}.</div>`
-    : '<div class="empty">Nenhuma despesa pessoal lançada neste mês.</div>';
+      + `<div class="tot"><span>Total em ${NOMES[m.mes]}</span><span style="color:var(--roxo)">${brl(m.prolab)}</span></div>`
+    : '<div class="empty">Nenhum gasto da Edilânia lançado neste mês.</div>') + nota;
 }
 
 function contasPagar(){
@@ -2126,29 +2185,35 @@ function anual(){
   const ms=ANO.meses;
   $('cards-ano').innerHTML = `
     <div class="card" style="--c:var(--verde)"><div class="rot">Faturamento 2026</div>
-      <div class="val" style="color:var(--verde)">${brl(ANO.fat)}</div><div class="obs">${ANO.n} meses com movimento</div></div>
+      <div class="val" style="color:var(--verde)">${brl(ANO.fat)}</div><div class="obs">${ms.length} meses com movimento</div></div>
     <div class="card" style="--c:var(--vermelho)"><div class="rot">Despesas 2026</div>
       <div class="val" style="color:var(--vermelho)">${brl(ANO.custoVar+ANO.custoFix)}</div><div class="obs">custos da loja (competência)</div></div>
-    <div class="card wide" style="--c:${ANO.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}"><div class="rot">Resultado do ano</div>
+    <div class="card" style="--c:var(--roxo)"><div class="rot">Pró-labore Edilânia</div>
+      <div class="val" style="color:var(--roxo)">${brl(ANO.prolab)}</div><div class="obs">combinado: ${brl(CFG.plComb)} por mês</div></div>
+    <div class="card" style="--c:${ANO.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}"><div class="rot">Resultado da loja</div>
       <div class="val" style="color:${ANO.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(ANO.resultado)}</div>
-      <div class="obs">margem líquida de ${pct(ANO.margemLiq)} · média de ${brl(ANO.resMed)} por mês</div></div>`;
+      <div class="obs">antes da Edilânia · margem de ${pct(ANO.margemLiq)}</div></div>
+    <div class="card wide" style="--c:${ANO.resultadoFinal>=0?'var(--verdeEsc)':'var(--vermelho)'}"><div class="rot">Sobra final do ano</div>
+      <div class="val" style="color:${ANO.resultadoFinal>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(ANO.resultadoFinal)}</div>
+      <div class="obs">resultado da loja − pró-labore da Edilânia</div></div>`;
 
-  const max=Math.max(...ms.map(m=>Math.max(m.fat,m.custoVar+m.custoFix)),1);
+  const gas=m=>m.custoVar+m.custoFix+m.prolab;
+  const max=Math.max(...ms.map(m=>Math.max(m.fat,gas(m))),ANO.pe,1);
   const W=Math.max(240, ms.length*54), H=180, base=H-24, k0=(base-14)/max;
   const pe=ANO.pe, yPe=base-pe*k0;
 
   const barras=ms.map((m,k)=>{
-    const x=k*54+12, hf=Math.max(2,m.fat*k0), hd=Math.max(2,(m.custoVar+m.custoFix)*k0);
+    const x=k*54+12, hf=Math.max(2,m.fat*k0), hd=Math.max(2,gas(m)*k0);
     const at=Math.min(k*70,700);
     return `<rect class="cresce" style="animation-delay:${at}ms" x="${x}" y="${base-hf}" width="15" height="${hf}" rx="3"
               fill="var(--c3)" data-t="${esc(m.nome+' · faturou '+brl(m.fat))}"/>
             <rect class="cresce" style="animation-delay:${at+60}ms" x="${x+17}" y="${base-hd}" width="15" height="${hd}" rx="3"
-              fill="var(--c5)" data-t="${esc(m.nome+' · gastou '+brl(m.custoVar+m.custoFix))}"/>
+              fill="var(--c5)" data-t="${esc(m.nome+' · loja '+brl(m.custoVar+m.custoFix)+' + Edilânia '+brl(m.prolab))}"/>
             <text x="${x+16}" y="${base+15}" text-anchor="middle" font-size="11" fill="var(--eixo)" font-weight="600">${MESES[m.mes]}</text>`;
   }).join('');
 
   $('b-ano').innerHTML=`
-    <div class="leg"><span><i style="background:var(--c3)"></i>Faturamento</span><span><i style="background:var(--c5)"></i>Despesas</span>
+    <div class="leg"><span><i style="background:var(--c3)"></i>Faturamento</span><span><i style="background:var(--c5)"></i>Despesas + pró-labore</span>
       <span><i style="background:var(--c2);height:3px;border-radius:2px"></i>Ponto de equilíbrio</span></div>
     <div><svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto">
       <line x1="0" y1="${base}" x2="${W}" y2="${base}" stroke="var(--grade)" stroke-width="1"/>
@@ -2158,30 +2223,34 @@ function anual(){
     <div style="margin-top:6px">
     ${ms.map(m=>`<div class="row"><div class="m">
         <div class="n">${m.nome}</div>
-        <div class="d">Faturou ${brl(m.fat)} · Gastou ${brl(m.custoVar+m.custoFix)} · Margem ${pct(m.mcPct)}${m.receber?' · A receber '+brl(m.receber):''}</div>
-      </div><div class="v ${m.resultado>=0?'in':'out'}">${brl(m.resultado)}</div></div>`).join('')}
+        <div class="d">Faturou ${brl(m.fat)} · Loja gastou ${brl(m.custoVar+m.custoFix)} · Edilânia ${brl(m.prolab)}${m.receber?' · A receber '+brl(m.receber):''}</div>
+      </div><div class="v ${m.resultadoFinal>=0?'in':'out'}">${brl(m.resultadoFinal)}</div></div>`).join('')}
     </div>
-    <div class="tot"><span>Resultado acumulado 2026</span>
-      <span style="color:${ANO.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(ANO.resultado)}</span></div>
-    <div class="nota">A linha tracejada é o ponto de equilíbrio médio (${brl(ANO.pe)}): meses com a barra verde abaixo dela fecharam no prejuízo.
-      Os valores por mês são por competência — no ano, o caixa somou ${brl(ANO.saldo)}.</div>`;
+    <div class="tot"><span>Sobra final acumulada 2026</span>
+      <span style="color:${ANO.resultadoFinal>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(ANO.resultadoFinal)}</span></div>
+    <div class="nota">O valor de cada mês é a <b>sobra final</b>: resultado da loja menos o pró-labore da Edilânia.
+      A linha tracejada é o ponto de equilíbrio médio (${brl(ANO.pe)}), que já inclui os ${brl(CFG.plComb)} combinados com ela:
+      meses com a barra verde abaixo dela não pagariam tudo. Os valores são por competência — no ano, o caixa somou ${brl(ANO.saldoFinal)} depois da Edilânia.</div>`;
 
   ligarTip($('b-ano'));
 
   /* DRE anual */
-  const g=c=>ANO.catTot[c]||0;
+  /* total = todos os meses com movimento; média = só os meses já fechados (igual à planilha) */
+  const lin=(rot,fn,forte)=>[rot, ms.reduce((a,m)=>a+fn(m),0), ANO.fechados.reduce((a,m)=>a+fn(m),0)/ANO.n, forte];
+  const gc=c=>m=>(m.catTot[c]||0);
   const rows=[
-    ['Receita líquida', ANO.fat, ANO.fatMed, true],
-    ['(−) Fornecedores / Mercadoria', -g('Fornecedores / Mercadoria'), -g('Fornecedores / Mercadoria')/ANO.n],
-    ['(−) Impostos e Taxas', -g('Impostos e Taxas'), -g('Impostos e Taxas')/ANO.n],
-    ['(−) Transporte e Entregas', -(g('Transporte e Entregas')-ANO.estac), -(g('Transporte e Entregas')-ANO.estac)/ANO.n],
-    ['(−) Comissões (Wiliam)', -ANO.com, -ANO.com/ANO.n],
-    ['(=) Margem de contribuição', ANO.mc, ANO.mcMed, true],
-  ].concat(CAT_FIX.map(c=>c===CAT_SAL?['(−) Salários e Encargos', -(g(c)-ANO.com), -(g(c)-ANO.com)/ANO.n]:['(−) '+c, -g(c), -g(c)/ANO.n]).filter(r=>r[1]!==0))
-   .concat(ANO.estac?[['(−) Estacionamento', -ANO.estac, -ANO.estac/ANO.n]]:[])
-   .concat([['(=) Custos fixos', -ANO.custoFix, -ANO.fixMed, true],
-            ['(=) RESULTADO', ANO.resultado, ANO.resMed, true],
-            ['Pró-labore / pessoal (fora do resultado)', -ANO.prolab, -ANO.prolab/ANO.n]]);
+    lin('Receita líquida', m=>m.fat, true),
+    lin('(−) Fornecedores / Mercadoria', m=>-gc('Fornecedores / Mercadoria')(m)),
+    lin('(−) Impostos e Taxas', m=>-gc('Impostos e Taxas')(m)),
+    lin('(−) Transporte e Entregas', m=>-(gc('Transporte e Entregas')(m)-m.estac)),
+    lin('(−) Comissões (Wiliam)', m=>-m.com),
+    lin('(=) Margem de contribuição', m=>m.mc, true),
+  ].concat(CAT_FIX.map(c=>c===CAT_SAL?lin('(−) Salários e Encargos', m=>-(gc(c)(m)-m.com)):lin('(−) '+c, m=>-gc(c)(m))).filter(r=>r[1]!==0))
+   .concat(ANO.estac?[lin('(−) Estacionamento', m=>-m.estac)]:[])
+   .concat([lin('(=) Custos fixos', m=>-m.custoFix, true),
+            lin('(=) RESULTADO DA LOJA', m=>m.resultado, true),
+            lin('(−) Pró-labore Edilânia', m=>-m.prolab),
+            lin('(=) SOBRA FINAL', m=>m.resultadoFinal, true)]);
 
   $('c-dreano').textContent = ANO.n+' meses';
   $('b-dreano').innerHTML = `<div class="scroll"><table class="tb">
@@ -2191,18 +2260,18 @@ function anual(){
         <td style="color:${t<0?'var(--vermelho)':'var(--ink)'}">${brl0(t)}</td>
         <td style="color:${md<0?'var(--vermelho)':'var(--ink)'}">${brl0(md)}</td></tr>`).join('')}
     </table></div>
-    <div class="nota">A média divide pelos ${ANO.n} meses com movimento. Taxas de máquina (${brl(ANO.taxas)} no ano) já estão descontadas da receita líquida.</div>`;
+    <div class="nota">O total soma todos os meses com movimento; a média divide só pelos ${ANO.n} meses já fechados (o mês em andamento fica fora). Taxas de máquina (${brl(ANO.taxas)} no ano) já estão descontadas da receita líquida.</div>`;
 
   /* reserva e impostos */
-  const ideal=ANO.fixMed*CFG.mesesCob, falta=Math.max(0,ideal-CFG.reserva);
-  const cob=ANO.fixMed>0?CFG.reserva/ANO.fixMed:0;
+  const ideal=ANO.fixTot*CFG.mesesCob, falta=Math.max(0,ideal-CFG.reserva);
+  const cob=ANO.fixTot>0?CFG.reserva/ANO.fixTot:0;
   $('b-reserva').innerHTML = `
-    <div class="kv"><span class="k">Custo fixo médio mensal</span><span class="vv">${brl(ANO.fixMed)}</span></div>
+    <div class="kv"><span class="k">Custo fixo médio + pró-labore combinado</span><span class="vv">${brl(ANO.fixTot)}</span></div>
     <div class="kv"><span class="k">Reserva ideal (${CFG.mesesCob} meses)</span><span class="vv">${brl(ideal)}</span></div>
     <div class="kv"><span class="k">Reserva que existe hoje</span><span class="vv">${brl(CFG.reserva)}</span></div>
     <div class="kv"><span class="k">Falta guardar</span><span class="vv" style="color:${falta?'var(--vermelho)':'var(--verdeEsc)'}">${brl(falta)}</span></div>
     <div class="bar" style="height:10px"><i style="width:${Math.min(100,ideal?CFG.reserva/ideal*100:0).toFixed(1)}%;background:${falta?'var(--ambar)':'var(--verdeEsc)'}"></i></div>
-    <div class="nota">Com a reserva de hoje a loja aguenta cerca de <b>${cob.toFixed(1)} meses</b> de custo fixo sem vender nada.</div>
+    <div class="nota">Com a reserva de hoje a loja aguenta cerca de <b>${cob.toFixed(1)} meses</b> pagando os custos fixos e a Edilânia sem vender nada.</div>
     <div class="kv" style="margin-top:14px"><span class="k">Regime / alíquota estimada</span><span class="vv">Simples · ${pct(CFG.aliquota)}</span></div>
     <div class="kv"><span class="k">Imposto estimado por mês</span><span class="vv">${brl(ANO.fatMed*CFG.aliquota)}</span></div>
     <div class="kv"><span class="k">Imposto estimado no ano</span><span class="vv">${brl(ANO.fatMed*CFG.aliquota*12)}</span></div>
