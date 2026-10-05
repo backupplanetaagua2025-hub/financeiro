@@ -1709,7 +1709,7 @@ function cardsMes(m){
   const cs=[
     {r:'Faturamento',v:m.fat,c:'var(--verde)',o: m.novo? 'já sem taxas de máquina e sem o que não foi pago' : 'entradas do mês'},
     {r:'Despesas da loja',v:m.desp,c:'var(--vermelho)',o: m.giro? 'sem capital de giro a devolver ('+brl(m.giro)+')' : 'saídas da loja (sem pró-labore)'},
-    {r:'Saldo antes da Edilânia',v:m.saldo,c: m.saldo>=0?'var(--verdeEsc)':'var(--vermelho)',o:'faturamento − despesas da loja'},
+    {r:'Saldo antes do pró-labore',v:m.saldo,c: m.saldo>=0?'var(--verdeEsc)':'var(--vermelho)',o:'faturamento − despesas da loja'},
   ];
   const st=plSituacao(m.prolab, m.mes);
   cs.push({r:'Pró-labore Edilânia',v:m.prolab,c: st.ok?'var(--roxo)':'var(--vermelho)',
@@ -1890,7 +1890,7 @@ function dre(m){
     ${L('(=) Margem de contribuição', m.mc, false, true)}
     <div class="kv"><span class="k">Margem de contribuição (%)</span><span class="vv">${pct(m.mcPct)}</span></div>
     ${L('(−) Custos fixos', m.custoFix, true, true)}
-    ${L('(=) Resultado da loja (antes da Edilânia)', m.resultado, false, true)}
+    ${L('(=) Resultado da loja (antes do pró-labore)', m.resultado, false, true)}
     <div class="kv"><span class="k">Margem da loja (%)</span>
       <span class="vv" style="color:${m.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}">${pct(m.margemLiq)}</span></div>
     ${L('(−) Pró-labore Edilânia', m.prolab, true)}
@@ -1908,7 +1908,7 @@ function indicadores(m){
     ['Custo fixo médio por mês', brl(ANO.fixMed)],
     ['Margem de contribuição média', pct(ANO.mcPct)],
     ['Margem líquida média', pct(ANO.margemLiq)],
-    ['Resultado médio da loja por mês (antes da Edilânia)', brl(ANO.resMed)],
+    ['Resultado médio da loja por mês (antes do pró-labore)', brl(ANO.resMed)],
     ['Pró-labore combinado da Edilânia', brl(CFG.plComb)+' por mês'],
     ['Pró-labore que ela gastou, em média', brl(ANO.plMed)+' por mês'],
     ['Sobra média depois do pró-labore combinado', brl(ANO.sobraMed)],
@@ -2192,7 +2192,7 @@ function anual(){
       <div class="val" style="color:var(--roxo)">${brl(ANO.prolab)}</div><div class="obs">combinado: ${brl(CFG.plComb)} por mês</div></div>
     <div class="card" style="--c:${ANO.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}"><div class="rot">Resultado da loja</div>
       <div class="val" style="color:${ANO.resultado>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(ANO.resultado)}</div>
-      <div class="obs">antes da Edilânia · margem de ${pct(ANO.margemLiq)}</div></div>
+      <div class="obs">antes do pró-labore · margem de ${pct(ANO.margemLiq)}</div></div>
     <div class="card wide" style="--c:${ANO.resultadoFinal>=0?'var(--verdeEsc)':'var(--vermelho)'}"><div class="rot">Sobra final do ano</div>
       <div class="val" style="color:${ANO.resultadoFinal>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(ANO.resultadoFinal)}</div>
       <div class="obs">resultado da loja − pró-labore da Edilânia</div></div>`;
@@ -2230,7 +2230,7 @@ function anual(){
       <span style="color:${ANO.resultadoFinal>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(ANO.resultadoFinal)}</span></div>
     <div class="nota">O valor de cada mês é a <b>sobra final</b>: resultado da loja menos o pró-labore da Edilânia.
       A linha tracejada é o ponto de equilíbrio médio (${brl(ANO.pe)}), que já inclui os ${brl(CFG.plComb)} combinados com ela:
-      meses com a barra verde abaixo dela não pagariam tudo. Os valores são por competência — no ano, o caixa somou ${brl(ANO.saldoFinal)} depois da Edilânia.</div>`;
+      meses com a barra verde abaixo dela não pagariam tudo. Os valores são por competência — no ano, o caixa somou ${brl(ANO.saldoFinal)} depois do pró-labore.</div>`;
 
   ligarTip($('b-ano'));
 
