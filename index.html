@@ -392,6 +392,47 @@
   .sheet .resumoPer{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px}
   @media (prefers-reduced-motion:reduce){ .sheet,.sheet .caixa{animation:none} }
 
+
+  /* ---------- busca geral + atalhos (07/10/2026) ---------- */
+  .hbtn svg{width:19px;height:19px;display:block;margin:auto}
+  .atalhos{display:flex;gap:7px;overflow-x:auto;padding:10px 1px 2px;margin:2px 0 0;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .atalhos::-webkit-scrollbar{display:none}
+  .atalho{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:650;
+    padding:8px 13px;border-radius:20px;border:1px solid var(--line);background:var(--card);
+    color:var(--ink);box-shadow:var(--shadow);cursor:pointer;white-space:nowrap;
+    transition:transform .15s ease,border-color .2s ease}
+  .atalho:hover{border-color:var(--azulClaro)}
+  .atalho:active{transform:scale(.95)}
+  .atalho i{font-style:normal;font-size:14px;line-height:1}
+  .sheet.busca{align-items:flex-start}
+  .sheet.busca .caixa{border-radius:0 0 22px 22px;max-height:88vh;
+    padding:calc(14px + env(safe-area-inset-top)) 16px 16px;animation:desce .26s cubic-bezier(.2,.8,.3,1)}
+  @keyframes desce{from{transform:translateY(-30px);opacity:0}to{transform:none;opacity:1}}
+  .bq-linha{display:flex;gap:8px;align-items:center}
+  .bq-linha button{flex:none;border:0;background:none;color:var(--azulClaro);font-weight:700;font-size:14px;
+    padding:8px 4px;cursor:pointer}
+  .sheet.busca .atalhos{flex-wrap:wrap;overflow:visible;padding-top:12px}
+  .sheet.busca .atalho{box-shadow:none;background:var(--card2)}
+  .bgr{font-size:10.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+    margin:16px 2px 4px}
+  .bres{display:flex;gap:10px;align-items:center;padding:10px 8px;border-radius:12px;cursor:pointer;
+    border-top:1px solid var(--line)}
+  .bres:first-of-type{border-top:0}
+  .bres:hover,.bres.sel{background:var(--card2)}
+  .bres .ic{flex:none;width:30px;height:30px;border-radius:9px;background:var(--tagbg);
+    display:flex;align-items:center;justify-content:center;font-size:15px}
+  .bres .m{flex:1;min-width:0}
+  .bres .n{font-size:13.5px;font-weight:650;line-height:1.3;word-break:break-word}
+  .bres .d{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35;word-break:break-word}
+  .bres .v{font-size:13px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .bres mark{background:rgba(183,121,31,.22);color:inherit;border-radius:3px;padding:0 1px}
+  .bmais{font-size:11.5px;color:var(--muted);padding:8px 8px 0}
+  @media (min-width:900px){ .atalhos{flex-wrap:wrap;overflow:visible} }
+  section.realce{animation:realce 1.6s ease}
+  @keyframes realce{0%,30%{box-shadow:0 0 0 3px var(--azulClaro),var(--shadow)}100%{box-shadow:var(--shadow)}}
+  @media (prefers-reduced-motion:reduce){ section.realce,.sheet.busca .caixa{animation:none} }
+
   /* ---------- telas maiores (tablet / computador) ---------- */
   @media (min-width:700px){
     .wrap,.hd{max-width:760px}
@@ -480,6 +521,7 @@
     <h1 id="titulo">Painel Financeiro
       <span class="sub" id="atualizado">carregando planilha…</span>
     </h1>
+    <button class="hbtn" id="buscarBtn" title="Buscar em todo o painel (Ctrl+K)" aria-label="Buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20.5 20.5"/></svg></button>
     <button class="hbtn" id="tema" title="Trocar tema">🌙</button>
     <button class="hbtn" id="recarregar" title="Recarregar dados">⟳</button>
   </div>
@@ -504,6 +546,7 @@
       </div>
       <button class="hojebtn" id="d-hoje" hidden>Voltar para hoje</button>
       <button class="hojebtn pdfbtn" id="d-pdf">&#128196; Gerar PDF &mdash; do dia ou de um per&iacute;odo</button>
+      <div class="atalhos" id="atalhosHoje" aria-label="Atalhos"></div>
 
       <div class="cards" id="cards-dia"></div>
       <div id="d-resumo"></div>
@@ -1271,6 +1314,7 @@ function montar(){
   $('pp-ate').onchange= e=>{ ppPreset=''; ppAte=dt(e.target.value)||ppAte; if(ppAte<ppDe) ppDe=ppAte; pintarPdf(); };
   document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !$('pdfSheet').hidden) fecharPdf(); });
 
+  montarBusca();
   $('mesbar').hidden = (aba==='t-ano'||aba==='t-hoje');
   $('carregando').hidden=true; $('app').hidden=false; $('tabs').hidden=false;
   $('recarregar').classList.remove('girando');
@@ -1305,6 +1349,198 @@ function plBloco(gasto, mi, titulo){
     <div class="plt"><span>${titulo||'Pró-labore da Edilânia'}</span><b style="color:${st.ok?'var(--roxo)':'var(--vermelho)'}">${brl(gasto)}</b></div>
     <div class="bar"><i style="width:${(p*100).toFixed(1)}%;background:${st.ok?'var(--roxo)':'var(--vermelho)'}"></i></div>
     <div class="pls">de ${brl(comb)} combinados · <b style="color:${st.cor}">${st.txt}</b></div></div>`;
+}
+
+
+/* ================= BUSCA GERAL + ATALHOS (07/10/2026) =================
+   Lupa no topo (ou Ctrl+K / tecla "/") abre uma busca que acha:
+   seções de qualquer aba, lançamentos de todos os meses e contas a pagar.
+   Os atalhos aparecem na aba Hoje e na própria busca. */
+const PALAVRAS = {
+  'b-diaitens':'hoje vendas do dia lancamentos do dia movimento',
+  'b-diames':'mes ate hoje acumulado parcial',
+  'b-diaevol':'dia a dia diario evolucao',
+  'b-dias':'dia a dia diario calendario',
+  'b-pend':'devendo fiado a receber pendente aguardando pagamento cobrar divida',
+  'b-lanc':'lancamentos todos extrato vendas despesas historico buscar',
+  'b-meta':'meta metas lucrar quanto preciso vender objetivo',
+  'b-dre':'dre resultado lucro prejuizo demonstrativo',
+  'b-ind':'indicadores ticket medio numeros chave',
+  'b-cx':'caixa competencia diferenca',
+  'b-fixvar':'despesas gastos fixas variaveis categorias custos',
+  'b-pessoal':'edilania pro labore prolabore retiradas pessoal adriano combinado',
+  'b-pagar':'contas a pagar boletos fornecedores vencimento parcelas duplicatas',
+  'b-giro':'capital de giro banco do brasil bb emprestimo devolver',
+  'b-prodmes':'produtos mais vendidos ranking refil purificador',
+  'b-prodano':'produtos mais vendidos ano ranking',
+  'b-marg':'margem custo preco precificacao quanto sobra lucro por produto',
+  'b-cli':'clientes maiores quem mais comprou',
+  'b-ano':'mes a mes grafico anual faturamento',
+  'b-dreano':'dre anual resultado do ano',
+  'b-reserva':'reserva impostos das simples nacional guardado seguranca'
+};
+const ATALHOS = [
+  {t:'Hoje', ic:'☀️', aba:'t-hoje', topo:true},
+  {t:'Contas a pagar', ic:'🧾', alvo:'b-pagar'},
+  {t:'Quem está devendo', ic:'⏳', alvo:'b-pend'},
+  {t:'Lançamentos', ic:'📋', alvo:'b-lanc'},
+  {t:'Pró-labore', ic:'👤', alvo:'b-pessoal'},
+  {t:'Ponto de equilíbrio', ic:'🎯', alvo:'pe-box', aba:'t-res'},
+  {t:'Margem por produto', ic:'📦', alvo:'b-marg'},
+  {t:'Reserva e impostos', ic:'🛡️', alvo:'b-reserva'},
+  {t:'Gerar PDF', ic:'📄', acao:()=>abrirPdf('dia')}
+];
+let SECOES=[];
+
+function montarBusca(){
+  SECOES=[];
+  document.querySelectorAll('.tab').forEach(tab=>{
+    const btn=document.querySelector(`nav.tabs button[data-tab="${tab.id}"]`);
+    const abaNome=btn?btn.textContent.trim():'';
+    tab.querySelectorAll('.sec-h').forEach(h=>{
+      const titulo=h.querySelector('h2').textContent.trim();
+      SECOES.push({t:titulo, abaNome, aba:tab.id, alvo:h.dataset.alvo,
+        chave:norm(titulo+' '+abaNome+' '+(PALAVRAS[h.dataset.alvo]||''))});
+    });
+  });
+  SECOES.push({t:'Ponto de equilíbrio', abaNome:'Resultado', aba:'t-res', alvo:'pe-box',
+    chave:norm('ponto de equilibrio resultado margem de contribuicao quanto preciso faturar')});
+  SECOES.push({t:'Cartões do mês', abaNome:'Mês', aba:'t-mes', alvo:'cards',
+    chave:norm('cartoes resumo do mes faturamento despesas saldo sobra final')});
+  SECOES.push({t:'Gerar PDF (dia ou período)', abaNome:'Hoje', acao:()=>abrirPdf('dia'),
+    chave:norm('gerar pdf imprimir relatorio exportar')});
+
+  const html=ATALHOS.map((a,k)=>`<button class="atalho" data-k="${k}"><i>${a.ic}</i>${esc(a.t)}</button>`).join('');
+  $('atalhosHoje').innerHTML=html;
+  $('atalhosHoje').querySelectorAll('.atalho').forEach(b=>b.onclick=()=>irPara(ATALHOS[+b.dataset.k]));
+
+  $('buscarBtn').onclick=abrirBusca;
+  $('bq-fechar').onclick=fecharBusca;
+  $('buscaSheet').onclick=e=>{ if(e.target.id==='buscaSheet') fecharBusca(); };
+  $('bq').oninput=()=>pintarBusca();
+  $('bq').onkeydown=e=>{
+    const it=[...$('bRes').querySelectorAll('.bres')];
+    let k=it.findIndex(x=>x.classList.contains('sel'));
+    if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault();
+      if(!it.length) return; if(k>=0) it[k].classList.remove('sel');
+      k = e.key==='ArrowDown' ? Math.min(it.length-1,k+1) : Math.max(0,k-1);
+      it[k].classList.add('sel'); it[k].scrollIntoView({block:'nearest'}); }
+    if(e.key==='Enter'){ e.preventDefault(); const alvo=it[k>=0?k:0]; if(alvo) alvo.click(); }
+  };
+  if(window._buscaTeclas) return; window._buscaTeclas=true;
+  document.addEventListener('keydown',e=>{
+    const aberto=!$('buscaSheet').hidden;
+    if(e.key==='Escape' && aberto){ fecharBusca(); return; }
+    const emCampo=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''));
+    if(((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k') || (e.key==='/' && !emCampo && !aberto)){
+      e.preventDefault(); aberto ? $('bq').focus() : abrirBusca(); }
+  });
+}
+
+function abrirBusca(){
+  if(!$('pdfSheet').hidden) fecharPdf();
+  $('buscaSheet').hidden=false; $('bq').value=''; pintarBusca();
+  setTimeout(()=>$('bq').focus(),30);
+}
+function fecharBusca(){ $('buscaSheet').hidden=true; $('bq').blur(); }
+
+function marcar(txt, termos){
+  let s=esc(txt);
+  termos.forEach(q=>{ if(q.length<2) return;
+    const n=norm(txt); const i=n.indexOf(q);
+    if(i>=0 && n.length===String(txt).length){
+      const orig=String(txt).substr(i,q.length);
+      s=s.replace(esc(orig),'<mark>'+esc(orig)+'</mark>'); }
+  });
+  return s;
+}
+
+function pintarBusca(){
+  const bruto=$('bq').value, q=norm(bruto), termos=q.split(/\s+/).filter(Boolean);
+  const box=$('bRes');
+  if(!termos.length){
+    box.innerHTML='<div class="bgr">Atalhos</div><div class="atalhos">'+
+      ATALHOS.map((a,k)=>`<button class="atalho" data-k="${k}"><i>${a.ic}</i>${esc(a.t)}</button>`).join('')+
+      '</div><div class="nota">Digite o nome de uma seção (ex.: <b>boletos</b>, <b>margem</b>), de um cliente, produto ou fornecedor. No computador: <b>Ctrl+K</b> abre e <b>Enter</b> vai para o primeiro resultado.</div>';
+    box.querySelectorAll('.atalho').forEach(b=>b.onclick=()=>irPara(ATALHOS[+b.dataset.k]));
+    return;
+  }
+  const temTudo=ch=>termos.every(x=>ch.includes(x));
+  const RES=[]; let html='';
+
+  /* 1) seções */
+  const sec=SECOES.filter(s=>temTudo(s.chave))
+    .sort((a,b)=>(norm(b.t).startsWith(termos[0])?1:0)-(norm(a.t).startsWith(termos[0])?1:0));
+  if(sec.length){
+    html+='<div class="bgr">Ir para</div>';
+    sec.slice(0,8).forEach(s=>{ RES.push(()=>irPara(s));
+      html+=`<div class="bres" data-r="${RES.length-1}"><span class="ic">↪</span><div class="m">
+        <div class="n">${marcar(s.t,termos)}</div><div class="d">aba ${esc(s.abaNome)}</div></div></div>`; });
+  }
+
+  /* 2) contas a pagar */
+  const pg=PAGAR.filter(c=>temTudo(norm(c.nome+' '+c.desc+' '+c.obs+' '+c.status)));
+  if(pg.length){
+    html+='<div class="bgr">Contas a pagar</div>';
+    pg.slice(0,6).forEach(c=>{ RES.push(()=>irPara({alvo:'b-pagar'}));
+      html+=`<div class="bres" data-r="${RES.length-1}"><span class="ic">🧾</span><div class="m">
+        <div class="n">${marcar(c.nome,termos)}</div>
+        <div class="d">${c.venc?'vence '+ddmm(c.venc)+'/'+c.venc.getFullYear():'sem vencimento'}${c.status?' · '+esc(c.status):''}</div></div>
+        <div class="v" style="color:var(--vermelho)">${brl(c.valor)}</div></div>`; });
+    if(pg.length>6) html+=`<div class="bmais">+ ${pg.length-6} conta(s) — abra "Contas a pagar" para ver todas</div>`;
+  }
+
+  /* 3) lançamentos de todos os meses */
+  if(termos.join('').length>=2){
+    const it=[];
+    DADOS.forEach(m=>{ if(!m||!m.itens) return;
+      m.itens.forEach(i=>{ if(i.data && temTudo(norm([i.nome,i.produto,i.pessoa,i.obs,i.cat,i.forma].join(' ')))) it.push(i); }); });
+    it.sort((a,b)=>b.data-a.data);
+    if(it.length){
+      const ent=it.reduce((s,i)=>s+i.ent,0), sai=it.reduce((s,i)=>s+i.sai,0);
+      html+=`<div class="bgr">Lançamentos · ${it.length} no ano${ent?' · entradas '+brl(ent):''}${sai?' · saídas '+brl(sai):''}</div>`;
+      it.slice(0,25).forEach(i=>{ const venda=i.tipo==='venda';
+        RES.push(()=>irParaLancamento(i));
+        html+=`<div class="bres" data-r="${RES.length-1}"><span class="ic">${venda?(i.pend?'⏳':'💵'):(i.prolab?'👤':'💸')}</span><div class="m">
+          <div class="n">${marcar(i.nome||'—',termos)}</div>
+          <div class="d"><b>${ddmm(i.data)}</b>${i.produto?' · '+marcar(i.produto,termos):''}${!venda&&i.cat?' · '+esc(i.cat):''}${i.pend?' · aguardando pagamento':''}</div></div>
+          <div class="v" style="color:${venda?'var(--verdeEsc)':'var(--vermelho)'}">${venda?brl(i.ent):'−'+brl(i.sai)}</div></div>`; });
+      if(it.length>25) html+=`<div class="bmais">Mostrando os 25 mais recentes. Refine a busca (ex.: nome + produto).</div>`;
+    }
+  }
+  box.innerHTML = html || '<div class="empty">Nada encontrado para “'+esc(bruto)+'”.</div>';
+  box.querySelectorAll('.bres').forEach(r=>r.onclick=()=>RES[+r.dataset.r]());
+}
+
+/* leva até uma seção: troca de aba, abre o bloco se estiver fechado, rola e destaca */
+function irPara(s){
+  fecharBusca();
+  if(s.acao){ s.acao(); return; }
+  const alvoEl = s.alvo ? $(s.alvo) : null;
+  const tab = s.aba || (alvoEl && alvoEl.closest('.tab') ? alvoEl.closest('.tab').id : null);
+  if(tab) irParaAba(tab);
+  if(s.topo){ window.scrollTo({top:0,behavior:SEM_MOV?'auto':'smooth'}); return; }
+  if(!alvoEl) return;
+  const h=document.querySelector(`.sec-h[data-alvo="${s.alvo}"]`);
+  if(h && alvoEl.hidden) h.click();
+  const sec = alvoEl.closest('section') || alvoEl;
+  if(sec.hidden){ /* ex.: "Quem está devendo" só existe nos meses Ago–Dez */
+    sec.hidden=false; }
+  setTimeout(()=>{
+    const topo=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--topo'))||70;
+    const barra=(!$('mesbar').hidden && $('mesbar').closest('.tab')===null)? $('mesbar').offsetHeight : 0;
+    const y=sec.getBoundingClientRect().top+window.scrollY-topo-barra-10;
+    window.scrollTo({top:Math.max(0,y),behavior:SEM_MOV?'auto':'smooth'});
+    if(sec.tagName==='SECTION'){ sec.classList.remove('realce'); void sec.offsetWidth; sec.classList.add('realce'); }
+  },80);
+}
+
+/* lançamento encontrado na busca: abre o dia dele na aba Hoje */
+function irParaLancamento(i){
+  fecharBusca();
+  irParaAba('t-hoje');
+  irParaDia(i.data);
+  setTimeout(()=>irPara({alvo:'b-diaitens', aba:'t-hoje'}),60);
 }
 
 /* ================= ABA HOJE ================= */
@@ -2295,6 +2531,15 @@ function anual(){
       <button id="pp-cancelar">Cancelar</button>
       <button class="prim" id="pp-gerar">&#128196; Gerar PDF</button>
     </div>
+  </div>
+</div>
+<div class="sheet busca" id="buscaSheet" hidden>
+  <div class="caixa" role="dialog" aria-modal="true" aria-label="Buscar no painel">
+    <div class="bq-linha">
+      <input type="search" id="bq" placeholder="Buscar seção, cliente, produto, fornecedor…" autocomplete="off" enterkeyhint="go">
+      <button id="bq-fechar">Fechar</button>
+    </div>
+    <div id="bRes"></div>
   </div>
 </div>
 <div id="relPdf"></div>
