@@ -1990,7 +1990,7 @@ function telaDia(){
   crescerPilha($('d-resumo'));
 
   /* lançamentos do dia */
-  const itens = D ? D.itens.slice().sort((a,b)=>
+  const itens = D ? ordenarJuntando(D.itens, (a,b)=>
       (a.tipo===b.tipo ? (b.ent+b.sai)-(a.ent+a.sai) : (a.tipo==='venda'?-1:1))) : [];
   $('c-diaitens').textContent = itens.length ? itens.length+(itens.length===1?' lançamento':' lançamentos') : 'nenhum';
   $('b-diaitens').innerHTML = itens.length ? itens.map(itemHTML).join('')
@@ -2131,13 +2131,29 @@ function imprimir(nome){
   setTimeout(()=>{ document.title=tit; },800);
 }
 
+/* "(Mesma venda acima ...)" = 2ª forma de pagamento de uma venda. Ao ordenar, essa linha
+   tem que ficar logo abaixo da venda dela (mesmo cliente), senão o "acima" aponta para outra venda. */
+function ehContinuacao(i){ return i && i.tipo==='venda' && /^\(mesma venda/i.test(i.produto||''); }
+function ordenarJuntando(lista, cmp){
+  const grupos=[];
+  lista.forEach(i=>{
+    if(ehContinuacao(i)){
+      const g=[...grupos].reverse().find(g=>g[0].tipo==='venda' && g[0].nome===i.nome) || grupos[grupos.length-1];
+      if(g){ g.push(i); return; }
+    }
+    grupos.push([i]);
+  });
+  const soma=g=>({...g[0], ent:g.reduce((s,x)=>s+(x.ent||0),0), sai:g.reduce((s,x)=>s+(x.sai||0),0)});
+  return grupos.sort((a,b)=>cmp(soma(a),soma(b))).flat();
+}
+
 /* ---------- relatório de UM dia ---------- */
 function relatorioDia(dia, comLista){
   const m = (dia.getFullYear()===2026) ? DADOS[dia.getMonth()] : null;
   const D = (m && m.dias.find(x=>x.data.getTime()===dia.getTime())) || null;
   const ent=D?D.ent:0, sai=D?D.saiLoja:0, taxa=D?D.taxa:0, pend=D?D.pend:0, pes=D?D.saiPes:0;
   const saldo = ent - taxa - pend - sai;
-  const vendas = D ? D.itens.filter(i=>i.tipo==='venda') .sort((a,b)=>b.ent-a.ent) : [];
+  const vendas = D ? ordenarJuntando(D.itens.filter(i=>i.tipo==='venda'), (a,b)=>b.ent-a.ent) : [];
   const saidas = D ? D.itens.filter(i=>i.tipo!=='venda').sort((a,b)=>b.sai-a.sai) : [];
   const nv = vendas.filter(i=>i.ent>0).length;
 
@@ -2197,7 +2213,8 @@ function tabelaSaidas(saidas, comData, comLista, sai, pes){
 function itensPeriodo(de, ate){
   const out=[];
   DADOS.forEach(m=>{ (m.itens||[]).forEach(i=>{ if(i.data && i.data>=de && i.data<=ate) out.push(i); }); });
-  return out.sort((a,b)=>a.data-b.data || (a.tipo===b.tipo?0:(a.tipo==='venda'?-1:1)));
+  out.sort((a,b)=>a.data-b.data);
+  return ordenarJuntando(out, (a,b)=>a.data-b.data || (a.tipo===b.tipo?0:(a.tipo==='venda'?-1:1)));
 }
 function relatorioPeriodo(de, ate, comLista){
   const it = itensPeriodo(de, ate);
