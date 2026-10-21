@@ -473,58 +473,48 @@
     .wrap{padding-bottom:110px}
   }
   #relPdf{display:none}
-  /* PDF no visual novo (17/10/2026) — mesmas cores e fonte do site (tema claro fixo; papel é sempre branco) */
+  /* PDF no modelo antigo em cards coloridos — Adriano preferiu (voltou em 21/10/2026; o visual novo de 17/10 está no backup) */
   @media print{
     @page{size:A4 portrait;margin:12mm}
     html,body{background:#fff !important}
     body::before,body::after{display:none !important}
     body > *:not(#relPdf){display:none !important}
-    #relPdf{display:block !important;font-family:Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-      font-feature-settings:"tnum" 1;color:#1a2433;font-size:9.5pt;
+    #relPdf{display:block !important;font-family:Arial,Helvetica,sans-serif;color:#111;font-size:9.5pt;
       -webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
-  #relPdf .rd-cab{display:flex;justify-content:space-between;align-items:center;gap:12px;
-    border-bottom:1px solid #e3e8ee;padding-bottom:10px;margin-bottom:14px}
+  #relPdf h1{margin:0;font-size:17pt;color:#1F3864}
+  #relPdf .rd-sub{margin:2px 0 0;color:#444;font-size:10pt}
+  #relPdf .rd-cab{display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2.5px solid #1F3864;padding-bottom:6px;margin-bottom:12px}
   #relPdf .rd-marca{display:flex;align-items:center;gap:10px}
-  #relPdf .rd-circ{width:40px;height:40px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;
-    box-shadow:0 0 0 3px #e8f2fa;flex:none}
-  #relPdf .rd-circ img{height:28px;width:auto;display:block}
-  #relPdf h1{margin:0;font-size:15pt;font-weight:700;letter-spacing:-.02em;color:#1a2433}
-  #relPdf .rd-sub{margin:1px 0 0;color:#5b6676;font-size:9.5pt;font-weight:500}
-  #relPdf .rd-emit{font-size:8pt;color:#8792a2;text-align:right;line-height:1.45}
-  #relPdf .rd-emit b{color:#1a2433;font-weight:600}
-  #relPdf h2{font-size:10.5pt;font-weight:600;color:#1a2433;margin:16px 0 7px;letter-spacing:-.01em;
-    break-after:avoid;page-break-after:avoid}
-  #relPdf .rd-cards{display:flex;gap:8px;margin-bottom:8px}
-  #relPdf .rd-cards.seis{flex-wrap:wrap} #relPdf .rd-cards.seis .rd-card{flex:1 1 22%}
-  #relPdf .rd-card{flex:1;border:1px solid #e3e8ee;border-radius:10px;padding:8px 10px;background:#fff;break-inside:avoid}
-  #relPdf .rd-card .r{font-size:8pt;font-weight:500;color:#5b6676;display:flex;align-items:center;gap:5px}
-  #relPdf .rd-card .r::before{content:'';width:7px;height:7px;border-radius:2px;background:var(--k);flex:none}
-  #relPdf .rd-card .v{font-size:13.5pt;font-weight:700;letter-spacing:-.02em;color:#1a2433;margin-top:3px}
-  #relPdf .rd-card.neg .v{color:#c0362c}
-  #relPdf .rd-card .o{font-size:7.5pt;color:#8792a2;margin-top:2px;line-height:1.35}
-  #relPdf .dois{display:flex;gap:14px;align-items:flex-start} #relPdf .dois > div{flex:1;min-width:0}
-  #relPdf table{width:100%;border-collapse:collapse;font-size:8.6pt;border:1px solid #e3e8ee;border-radius:10px;
-    border-collapse:separate;border-spacing:0;overflow:hidden}
+  #relPdf .rd-circ{display:none}
+  #relPdf .rd-emit{font-size:8.5pt;color:#666;text-align:right}
+  #relPdf .rd-emit b{font-weight:normal}
+  #relPdf h2{font-size:11.5pt;color:#1F3864;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.4px;break-after:avoid;page-break-after:avoid}
+  #relPdf .rd-cards.seis{flex-wrap:wrap} #relPdf .rd-cards.seis .rd-card{flex:1 1 30%}
+  #relPdf .dois{display:flex;gap:12px;align-items:flex-start} #relPdf .dois > div{flex:1;min-width:0}
   #relPdf thead{display:table-header-group} #relPdf tfoot{display:table-row-group}
-  #relPdf th{background:#f6f8fa;color:#5b6676;text-align:left;padding:5px 7px;font-size:7.8pt;font-weight:600;
-    border-bottom:1px solid #e3e8ee}
-  #relPdf td{padding:4px 7px;border-bottom:1px solid #eef1f5;vertical-align:top}
-  #relPdf tbody tr:last-child td{border-bottom:none}
-  #relPdf td:first-child{font-weight:500}
+  #relPdf .prev td{color:#8a5a12;font-style:italic}
+  #relPdf .prevtit td{background:#fff !important;font-weight:700;color:#8a5a12;padding-top:8px}
+  #relPdf .atr{color:#C0392B;font-weight:700}
+  #relPdf .rd-cards{display:flex;gap:8px;margin-bottom:8px}
+  #relPdf .rd-card{flex:1;border:1px solid #D0D0D0;border-top:4px solid var(--k);border-radius:6px;padding:6px 8px;break-inside:avoid}
+  #relPdf .rd-card .r{font-size:7.5pt;text-transform:uppercase;letter-spacing:.4px;color:#555;font-weight:700}
+  #relPdf .rd-card .v{font-size:13pt;font-weight:800;color:var(--k);margin-top:2px}
+  #relPdf .rd-card .o{font-size:7.5pt;color:#666;margin-top:1px}
+  #relPdf table{width:100%;border-collapse:collapse;font-size:8.8pt}
+  #relPdf th{background:#1F3864;color:#fff;text-align:left;padding:4px 5px;font-size:8pt}
+  #relPdf td{padding:3px 5px;border-bottom:1px solid #D0D0D0;vertical-align:top}
+  #relPdf tbody tr:nth-child(even) td{background:#F3F4F6}
   #relPdf .n{text-align:right;white-space:nowrap}
-  #relPdf .ent{color:#0a7d55;font-weight:600} #relPdf .sai{color:#c0362c;font-weight:600}
-  #relPdf .pend{color:#a35c00;font-weight:600}
-  #relPdf .prev td{color:#a35c00;background:#fdf3e1}
-  #relPdf .prevtit td{background:#fff;font-weight:600;color:#a35c00;padding-top:8px}
-  #relPdf .atr{color:#c0362c;font-weight:600}
-  #relPdf tfoot td{font-weight:700;border-top:1px solid #e3e8ee;border-bottom:none;background:#f6f8fa;color:#1a2433}
+  #relPdf .ent{color:#1E7B34;font-weight:700} #relPdf .sai{color:#C0392B;font-weight:700}
+  #relPdf .pend{color:#B7791F;font-weight:700}
+  #relPdf tfoot td{font-weight:800;border-top:2px solid #1F3864;border-bottom:none;background:#fff}
   #relPdf tr{page-break-inside:avoid}
-  #relPdf .rd-fp{margin-top:7px;font-size:8.5pt;color:#5b6676}
-  #relPdf .rd-fp b{color:#1a2433;font-weight:600}
-  #relPdf .rd-nota{margin-top:6px;font-size:8pt;color:#8792a2}
-  #relPdf .rd-vazio{padding:12px;border:1px dashed #e3e8ee;border-radius:10px;color:#8792a2;text-align:center}
-  #relPdf .rd-rodape{margin-top:18px;padding-top:8px;border-top:1px solid #eef1f5;font-size:7.5pt;color:#8792a2;text-align:center}
+  #relPdf .rd-fp{margin-top:6px;font-size:8.8pt;color:#333}
+  #relPdf .rd-nota{margin-top:6px;font-size:8pt;color:#666;font-style:italic}
+  #relPdf .rd-vazio{padding:10px;border:1px dashed #bbb;color:#555;text-align:center}
+  #relPdf .rd-rodape{margin-top:18px;padding-top:6px;border-top:1px solid #D0D0D0;font-size:7.5pt;color:#666;text-align:center}
 
   /* =====================================================================
      VISUAL NOVO (13/10/2026) — inspirado no painel da Stripe + app do Nubank.
@@ -2125,7 +2115,7 @@ const fmtData = d => String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()
 const nomeArq = d => String(d.getDate()).padStart(2,'0')+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+d.getFullYear();
 const rdCard = (r,v,k,o)=>`<div class="rd-card${/^-|−/.test(String(v).trim())?' neg':''}" style="--k:${k}"><div class="r">${r}</div><div class="v">${v}</div>${o?`<div class="o">${o}</div>`:''}</div>`;
 const rdLogo = ()=>{ const im=document.querySelector('.circ img'); return im?`<div class="rd-circ"><img src="${im.src}" alt=""></div>`:''; };
-const rdCab = (tit,sub)=>`<div class="rd-cab"><div class="rd-marca">${rdLogo()}<div><h1>${tit.replace(/ — Planeta Água$/,'')}</h1><p class="rd-sub">${sub}</p></div></div>
+const rdCab = (tit,sub)=>`<div class="rd-cab"><div class="rd-marca">${rdLogo()}<div><h1>${tit}</h1><p class="rd-sub">${sub}</p></div></div>
   <div class="rd-emit"><b>Planeta Água</b><br>emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div></div>`;
 
 function imprimir(nome){
@@ -2162,19 +2152,19 @@ function relatorioDia(dia, comLista){
   const nv = vendas.filter(i=>i.ent>0).length;
 
   const desc=[]; if(taxa) desc.push('taxas '+brl(taxa)); if(pend) desc.push('não pago '+brl(pend));
-  let cards = rdCard('Entradas do dia',brl(ent),'#0a7d55', nv+(nv===1?' venda':' vendas'))
-            + rdCard('Saídas da loja',brl(sai),'#c0362c', saidas.filter(i=>!i.prolab).length+' lançamento(s)')
-            + rdCard('Saldo do dia',brl(saldo), saldo>=0?'#0c5b96':'#c0362c', desc.length?'descontados '+desc.join(' e '):'entradas − saídas');
-  if(pend) cards += rdCard('A receber do dia',brl(pend),'#a35c00','aguardando pagamento');
+  let cards = rdCard('Entradas do dia',brl(ent),'#1E7B34', nv+(nv===1?' venda':' vendas'))
+            + rdCard('Saídas da loja',brl(sai),'#C0392B', saidas.filter(i=>!i.prolab).length+' lançamento(s)')
+            + rdCard('Saldo do dia',brl(saldo), saldo>=0?'#0F9D8B':'#C0392B', desc.length?'descontados '+desc.join(' e '):'entradas − saídas');
+  if(pend) cards += rdCard('A receber do dia',brl(pend),'#B7791F','aguardando pagamento');
 
   const R = mesAte(m, dia);
   const nomeMes = m ? m.nome : NOMES[dia.getMonth()];
-  const cardsMes = rdCard('Faturamento',brl(R.fat),'#0c5b96','sem taxas e sem o que não foi pago')
-    + rdCard('Despesas da loja',brl(R.desp),'#c0362c','sem pró-labore')
-    + rdCard('Saldo do mês',brl(R.saldo), R.saldo>=0?'#0a7d55':'#c0362c', R.nVendas+' vendas · ticket '+brl(R.ticket))
-    + rdCard('A receber',brl(R.receber),'#a35c00','vendas ainda não pagas')
-    + rdCard('Pró-labore Edilânia',brl(R.prolab),'#6b46c1','de '+brl(CFG.plComb)+' combinados · '+plSituacao(R.prolab, dia.getMonth()).txt)
-    + rdCard('Sobra final do mês',brl(R.saldo-R.prolab),(R.saldo-R.prolab)>=0?'#0a7d55':'#c0362c','saldo − pró-labore');
+  const cardsMes = rdCard('Faturamento',brl(R.fat),'#0F9D8B','sem taxas e sem o que não foi pago')
+    + rdCard('Despesas da loja',brl(R.desp),'#C0392B','sem pró-labore')
+    + rdCard('Saldo do mês',brl(R.saldo), R.saldo>=0?'#1E7B34':'#C0392B', R.nVendas+' vendas · ticket '+brl(R.ticket))
+    + rdCard('A receber',brl(R.receber),'#B7791F','vendas ainda não pagas')
+    + rdCard('Pró-labore Edilânia',brl(R.prolab),'#6B4FA0','de '+brl(CFG.plComb)+' combinados · '+plSituacao(R.prolab, dia.getMonth()).txt)
+    + rdCard('Sobra final do mês',brl(R.saldo-R.prolab),(R.saldo-R.prolab)>=0?'#1E7B34':'#C0392B','saldo − pró-labore');
 
   const txt = porExtenso(dia);
   $('relPdf').innerHTML = rdCab('Relatório Diário — Planeta Água', txt.charAt(0).toUpperCase()+txt.slice(1)) + `
@@ -2231,13 +2221,13 @@ function relatorioPeriodo(de, ate, comLista){
   const ticket = nv ? vendas.filter(i=>i.ent>0).reduce((s,i)=>s+i.ent,0)/nv : 0;
   const nDias = Math.round((ate-de)/864e5)+1;
 
-  const cards = rdCard('Entradas',brl(ent),'#0a7d55', nv+(nv===1?' venda':' vendas')+' · ticket '+brl(ticket))
-    + rdCard('Faturamento',brl(fat),'#0c5b96', (taxa||pend)?'sem taxas ('+brl(taxa)+') e sem o não pago':'entradas recebidas')
-    + rdCard('Despesas da loja',brl(desp),'#c0362c', giro?'sem capital de giro a devolver ('+brl(giro)+')':'sem pró-labore')
-    + rdCard('Saldo do período',brl(saldo), saldo>=0?'#0a7d55':'#c0362c','faturamento − despesas')
-    + rdCard('A receber',brl(pend),'#a35c00','vendas do período ainda não pagas')
-    + rdCard('Pró-labore Edilânia',brl(pes),'#6b46c1','gastos dela pagos pela loja')
-    + rdCard('Sobra final',brl(saldo-pes),(saldo-pes)>=0?'#0a7d55':'#c0362c','saldo − pró-labore');
+  const cards = rdCard('Entradas',brl(ent),'#1E7B34', nv+(nv===1?' venda':' vendas')+' · ticket '+brl(ticket))
+    + rdCard('Faturamento',brl(fat),'#0F9D8B', (taxa||pend)?'sem taxas ('+brl(taxa)+') e sem o não pago':'entradas recebidas')
+    + rdCard('Despesas da loja',brl(desp),'#C0392B', giro?'sem capital de giro a devolver ('+brl(giro)+')':'sem pró-labore')
+    + rdCard('Saldo do período',brl(saldo), saldo>=0?'#1E7B34':'#C0392B','faturamento − despesas')
+    + rdCard('A receber',brl(pend),'#B7791F','vendas do período ainda não pagas')
+    + rdCard('Pró-labore Edilânia',brl(pes),'#6B4FA0','gastos dela pagos pela loja')
+    + rdCard('Sobra final',brl(saldo-pes),(saldo-pes)>=0?'#1E7B34':'#C0392B','saldo − pró-labore');
 
   /* dia a dia — ou mês a mês, se o período for longo */
   const porMes = nDias>62;
@@ -2343,10 +2333,10 @@ function relatorioPagar(comBoleto, previstas, de, ate){
   const fl=Object.entries(forn).sort((a,b)=>b[1].v-a[1].v);
   $('relPdf').innerHTML = rdCab('Contas a Pagar — Planeta Água', per) + `
     <div class="rd-cards">
-      ${rdCard('Com boleto em mãos',brl(totB),'#c0362c',comBoleto.length+' conta(s)')}
-      ${previstas.length?rdCard('Previsão',brl(totP),'#a35c00',previstas.length+' sem cobrança emitida'):''}
-      ${rdCard('Total do período',brl(totB+totP),'#0c5b96',(comBoleto.length+previstas.length)+' conta(s)')}
-      ${atrasadas.length?rdCard('Em atraso',brl(totA),'#c0362c',atrasadas.length+' conta(s) vencida(s)'):''}
+      ${rdCard('Com boleto em mãos',brl(totB),'#C0392B',comBoleto.length+' conta(s)')}
+      ${previstas.length?rdCard('Previsão',brl(totP),'#B7791F',previstas.length+' sem cobrança emitida'):''}
+      ${rdCard('Total do período',brl(totB+totP),'#1F3864',(comBoleto.length+previstas.length)+' conta(s)')}
+      ${atrasadas.length?rdCard('Em atraso',brl(totA),'#C0392B',atrasadas.length+' conta(s) vencida(s)'):''}
     </div>
     <h2>Contas</h2>
     ${comBoleto.length||previstas.length ? `<table><thead><tr><th>Vencimento</th><th>Fornecedor</th><th>Descrição</th><th>Situação</th><th class="n">Valor</th></tr></thead>
