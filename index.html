@@ -306,6 +306,8 @@
   .row.ehprev .n,.row.ehprev .v{color:var(--ambar)}
   .row.ehprev .n{font-style:italic}
   .tag.prev{background:color-mix(in srgb,var(--ambar) 16%,transparent);color:var(--ambar)}
+  .tag.pago{background:rgba(15,157,139,.16);color:var(--verde)}
+  .row.ehpago .v{color:var(--verde)}
   @supports not (background:color-mix(in srgb,red 50%,transparent)){ .tag.prev{background:var(--tagbg);color:var(--ambar)} }
   .subt{margin:14px 0 6px;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--ambar)}
 
@@ -496,6 +498,8 @@
   #relPdf thead{display:table-header-group} #relPdf tfoot{display:table-row-group}
   #relPdf .prev td{color:#8a5a12;font-style:italic}
   #relPdf .prevtit td{background:#fff !important;font-weight:700;color:#8a5a12;padding-top:8px}
+  #relPdf .pagotit td{background:#fff !important;font-weight:700;color:#1E7B34;padding-top:8px}
+  #relPdf .pagoL td{color:#1E7B34}
   #relPdf .atr{color:#C0392B;font-weight:700}
   #relPdf .rd-cards{display:flex;gap:8px;margin-bottom:8px}
   #relPdf .rd-card{flex:1;border:1px solid #D0D0D0;border-top:4px solid var(--k);border-radius:6px;padding:6px 8px;break-inside:avoid}
@@ -890,7 +894,7 @@
       </section>
 
       <section>
-        <div class="sec-h" data-alvo="b-pagar"><h2>Contas a pagar em aberto</h2><span class="cnt" id="c-pagar"></span><span class="arw">›</span></div>
+        <div class="sec-h" data-alvo="b-pagar"><h2>Contas a pagar</h2><span class="cnt" id="c-pagar"></span><span class="arw">›</span></div>
         <div class="sec-b" id="b-pagar" hidden></div>
       </section>
 
@@ -1285,7 +1289,7 @@ function tentar(){
 if($('gate')){ $('entrar').onclick=tentar; $('pw').onkeydown=e=>{if(e.key==='Enter')tentar()}; }
 
 /* ---------------- leitura da planilha ---------------- */
-let pgDe='', pgAte='', pgPreset='tudo';
+let pgDe='', pgAte='', pgPreset='tudo', pgPagos=false, PAGOS=[];
 let WB=null, DADOS=[], GIRO=[], GIROLIST=[], PAGAR=[], PRECOS=[], CFG={taxaCartao:.07,imposto:.06,reserva:0,mesesCob:3,aliquota:.06,vencDAS:20,plComb:4000};
 
 async function carregar(){
@@ -1342,7 +1346,7 @@ function processar(buf){
   }
 
   /* ---- contas a pagar em aberto ---- */
-  PAGAR=[];
+  PAGAR=[]; PAGOS=[];
   const cp = linhas('Contas a Pagar e Receber');
   if(cp) for(let i=10;i<cp.length;i++){
     const L=cp[i]||[]; const nome=String(L[0]||'').trim(); const v=num(L[3]);
@@ -1351,10 +1355,16 @@ function processar(buf){
     if(na.startsWith('total') || na.startsWith('previsto') || na.startsWith('contas a receber')) break;
     if(!nome || !v) continue;
     const st=String(L[4]||'');
-    if(norm(st)==='pago') continue;
+    if(norm(st)==='pago'){
+      /* contas já pagas: guardadas à parte, só aparecem quando o usuário pede "Incluir as já pagas" */
+      const mp=String(L[6]||'').match(/pago em (\d{1,2}\/\d{1,2}\/\d{4})/i);
+      PAGOS.push({nome, desc:String(L[1]||''), venc:dt(L[2]), valor:v, status:st, obs:String(L[6]||''), pagoEm: mp?dt(mp[1]):null});
+      continue;
+    }
     PAGAR.push({nome, desc:String(L[1]||''), venc:dt(L[2]), valor:v, status:st, obs:String(L[6]||'')});
   }
   PAGAR.sort((a,b)=>(a.venc?a.venc.getTime():9e15)-(b.venc?b.venc.getTime():9e15));
+  PAGOS.sort((a,b)=>(a.venc?a.venc.getTime():9e15)-(b.venc?b.venc.getTime():9e15));
 
   /* ---- precificação ---- */
   PRECOS=[];
@@ -1642,7 +1652,7 @@ const PALAVRAS = {
   'b-cx':'caixa competencia diferenca',
   'b-fixvar':'despesas gastos fixas variaveis categorias custos',
   'b-pessoal':'edilania pro labore prolabore retiradas pessoal adriano combinado',
-  'b-pagar':'contas a pagar boletos fornecedores vencimento parcelas duplicatas',
+  'b-pagar':'contas a pagar boletos fornecedores vencimento parcelas duplicatas pagas pagos semana',
   'b-giro':'capital de giro banco do brasil bb emprestimo devolver',
   'b-prodmes':'produtos mais vendidos ranking refil purificador',
   'b-prodano':'produtos mais vendidos ano ranking',
@@ -2319,31 +2329,42 @@ function gerarPdfPeriodo(){
 }
 
 /* ---------- PDF das contas a pagar do período filtrado ---------- */
-function relatorioPagar(comBoleto, previstas, de, ate){
+function relatorioPagar(comBoleto, previstas, de, ate, pagas){
+  const comPagas = Array.isArray(pagas); pagas = pagas||[];
   const hoje=meiaNoite(new Date());
   const totB=comBoleto.reduce((s,p)=>s+p.valor,0), totP=previstas.reduce((s,p)=>s+p.valor,0);
+  const totPg=pagas.reduce((s,p)=>s+p.valor,0), totAb=totB+totP;
   const atrasadas=comBoleto.filter(p=>p.venc && p.venc<hoje), totA=atrasadas.reduce((s,p)=>s+p.valor,0);
-  const per = (de||ate) ? (de?fmtData(dt(de)):'desde o início')+' a '+(ate?fmtData(dt(ate)):'sem data final') : 'Todas as contas em aberto';
+  const per = (de||ate) ? (de?fmtData(dt(de)):'desde o início')+' a '+(ate?fmtData(dt(ate)):'sem data final')
+            : comPagas ? 'Todas as contas (pagas e em aberto)' : 'Todas as contas em aberto';
   const sit = p => { if(norm(p.status)==='previsto') return /\(fixo mensal\)/i.test(p.obs||'')?'previsão · fixo mensal':'previsão · sem boleto';
     if(!p.venc) return '—'; const d=Math.floor((hoje-p.venc)/864e5);
     return d>0?`<span class="atr">${d} dia${d>1?'s':''} em atraso</span>`:d===0?'<span class="atr">vence hoje</span>':'em '+(-d)+' dia'+(d<-1?'s':''); };
   const linhas = (arr,prev)=>arr.map(p=>`<tr class="${prev?'prev':''}"><td>${p.venc?fmtData(p.venc):'—'}</td><td>${esc(p.nome)}</td>
       <td>${esc(p.desc)}</td><td>${sit(p)}</td><td class="n sai">${brl(p.valor)}</td></tr>`).join('');
-  const forn={}; [...comBoleto,...previstas].forEach(p=>{ const k=p.nome; if(!forn[k]) forn[k]={n:0,v:0}; forn[k].n++; forn[k].v+=p.valor; });
+  const linhasPg = arr=>arr.map(p=>`<tr class="pagoL"><td>${p.venc?fmtData(p.venc):'—'}</td><td>${esc(p.nome)}</td>
+      <td>${esc(p.desc)}</td><td>✓ pago${p.pagoEm?' em '+fmtData(p.pagoEm):''}</td><td class="n ent">${brl(p.valor)}</td></tr>`).join('');
+  const forn={}; [...comBoleto,...previstas,...pagas].forEach(p=>{ const k=p.nome; if(!forn[k]) forn[k]={n:0,v:0}; forn[k].n++; forn[k].v+=p.valor; });
   const fl=Object.entries(forn).sort((a,b)=>b[1].v-a[1].v);
-  $('relPdf').innerHTML = rdCab('Contas a Pagar — Planeta Água', per) + `
+  const temAlgo = comBoleto.length||previstas.length||pagas.length;
+  const nTot = comBoleto.length+previstas.length+pagas.length;
+  let foot='';
+  if(previstas.length) foot+=`<tr><td colspan="4">Com boleto em mãos</td><td class="n">${brl(totB)}</td></tr><tr><td colspan="4">Previsão</td><td class="n">${brl(totP)}</td></tr>`;
+  if(comPagas) foot+=`<tr><td colspan="4">Em aberto</td><td class="n">${brl(totAb)}</td></tr><tr><td colspan="4">Já pago</td><td class="n">${brl(totPg)}</td></tr>`;
+  foot+=`<tr><td colspan="4">${comPagas?'TOTAL DO PERÍODO (PAGO + EM ABERTO)':'TOTAL DO PERÍODO'}</td><td class="n">${brl(totAb+totPg)}</td></tr>`;
+  $('relPdf').innerHTML = rdCab(comPagas?'Contas Pagas e a Pagar — Planeta Água':'Contas a Pagar — Planeta Água', per) + `
     <div class="rd-cards">
-      ${rdCard('Com boleto em mãos',brl(totB),'#C0392B',comBoleto.length+' conta(s)')}
-      ${previstas.length?rdCard('Previsão',brl(totP),'#B7791F',previstas.length+' sem cobrança emitida'):''}
-      ${rdCard('Total do período',brl(totB+totP),'#1F3864',(comBoleto.length+previstas.length)+' conta(s)')}
+      ${rdCard(comPagas?'Em aberto':'Com boleto em mãos',brl(comPagas?totAb:totB),'#C0392B',(comPagas?comBoleto.length+previstas.length:comBoleto.length)+' conta(s)')}
+      ${previstas.length&&!comPagas?rdCard('Previsão',brl(totP),'#B7791F',previstas.length+' sem cobrança emitida'):''}
+      ${comPagas?rdCard('Já pago',brl(totPg),'#1E7B34',pagas.length+' conta(s)'):''}
+      ${rdCard('Total do período',brl(totAb+totPg),'#1F3864',nTot+' conta(s)')}
       ${atrasadas.length?rdCard('Em atraso',brl(totA),'#C0392B',atrasadas.length+' conta(s) vencida(s)'):''}
     </div>
     <h2>Contas</h2>
-    ${comBoleto.length||previstas.length ? `<table><thead><tr><th>Vencimento</th><th>Fornecedor</th><th>Descrição</th><th>Situação</th><th class="n">Valor</th></tr></thead>
-      <tbody>${linhas(comBoleto,false)}${previstas.length?`<tr class="prevtit"><td colspan="5">Previsão — compromissos certos, ainda sem cobrança emitida</td></tr>`+linhas(previstas,true):''}</tbody>
-      <tfoot>${previstas.length?`<tr><td colspan="4">Com boleto em mãos</td><td class="n">${brl(totB)}</td></tr><tr><td colspan="4">Previsão</td><td class="n">${brl(totP)}</td></tr>`:''}
-        <tr><td colspan="4">TOTAL DO PERÍODO</td><td class="n">${brl(totB+totP)}</td></tr></tfoot></table>`
-      : '<div class="rd-vazio">Nenhuma conta vencendo neste período.</div>'}
+    ${temAlgo ? `<table><thead><tr><th>Vencimento</th><th>Fornecedor</th><th>Descrição</th><th>Situação</th><th class="n">Valor</th></tr></thead>
+      <tbody>${comPagas&&(comBoleto.length||previstas.length)?`<tr class="prevtit"><td colspan="5" style="color:#C0392B">Em aberto</td></tr>`:''}${linhas(comBoleto,false)}${previstas.length?`<tr class="prevtit"><td colspan="5">Previsão — compromissos certos, ainda sem cobrança emitida</td></tr>`+linhas(previstas,true):''}${comPagas&&pagas.length?`<tr class="pagotit"><td colspan="5">Já pagas</td></tr>`+linhasPg(pagas):''}</tbody>
+      <tfoot>${foot}</tfoot></table>`
+      : '<div class="rd-vazio">Nenhuma conta neste período.</div>'}
     ${fl.length>1?`<h2>Por fornecedor</h2><table><thead><tr><th>Fornecedor</th><th class="n">Contas</th><th class="n">Valor</th></tr></thead>
       <tbody>${fl.map(([k,o])=>`<tr><td>${esc(k)}</td><td class="n">${o.n}</td><td class="n sai">${brl(o.v)}</td></tr>`).join('')}</tbody></table>`:''}`;
 }
@@ -2641,9 +2662,11 @@ function contasPagar(){
   const hoje=new Date(); hoje.setHours(0,0,0,0);
   const iso = d => d ? d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0') : '';
   const maisDias = (d,n) => { const x=new Date(d); x.setDate(x.getDate()+n); return x; };
+  const segunda = maisDias(hoje, -((hoje.getDay()+6)%7));
 
   const presets = {
     tudo:    ()=>['',''],
+    semana:  ()=>[iso(segunda), iso(maisDias(segunda,6))],
     mes:     ()=>[iso(new Date(hoje.getFullYear(),hoje.getMonth(),1)), iso(new Date(hoje.getFullYear(),hoje.getMonth()+1,0))],
     d30:     ()=>[iso(hoje), iso(maisDias(hoje,30))],
     proxmes: ()=>[iso(new Date(hoje.getFullYear(),hoje.getMonth()+1,1)), iso(new Date(hoje.getFullYear(),hoje.getMonth()+2,0))],
@@ -2662,19 +2685,25 @@ function contasPagar(){
   const ehPrev = p => norm(p.status)==='previsto';
   const lista  = PAGAR.filter(dentro);
   const comBoleto = lista.filter(p=>!ehPrev(p)), previstas = lista.filter(ehPrev);
+  /* "Já venceu" com as pagas não faz sentido (paga não está vencida) — nesse atalho elas ficam de fora */
+  /* paga entra pela data em que foi paga ("Pago em dd/mm/aaaa" nas observações); sem essa data, pelo vencimento */
+  const quando = p => p.pagoEm || p.venc;
+  const pagas  = pgPagos && pgPreset!=='atras' ? PAGOS.filter(p=>dentro({venc:quando(p)})).sort((x,y)=>(quando(x)||0)-(quando(y)||0)) : [];
   const totB = comBoleto.reduce((s,p)=>s+p.valor,0);
   const totP = previstas.reduce((s,p)=>s+p.valor,0);
-  const tot  = totB+totP;
+  const totPg = pagas.reduce((s,p)=>s+p.valor,0);
+  const totAb = totB+totP, tot = totAb+totPg;
   const totGeral = PAGAR.reduce((s,p)=>s+p.valor,0);
 
-  $('c-pagar').textContent = PAGAR.length? PAGAR.length+' · '+brl(totGeral) : 'nada em aberto';
+  $('c-pagar').textContent = PAGAR.length? PAGAR.length+' em aberto · '+brl(totGeral) : 'nada em aberto';
 
-  const chips=[['tudo','Tudo'],['mes','Este mês'],['d30','Próximos 30 dias'],['proxmes','Próximo mês'],['atras','Já venceu']];
+  const chips=[['tudo','Tudo'],['semana','Esta semana'],['mes','Este mês'],['d30','Próximos 30 dias'],['proxmes','Próximo mês'],['atras','Já venceu']];
   const topo = `<div class="per">
       <div class="cx"><label>De</label><input type="date" id="pg-de" value="${pgDe}"></div>
       <div class="cx"><label>Até</label><input type="date" id="pg-ate" value="${pgAte}"></div>
     </div>
-    <div class="chips">${chips.map(([k,t])=>`<span class="chip${pgPreset===k?' on':''}" data-p="${k}">${t}</span>`).join('')}</div>`;
+    <div class="chips">${chips.map(([k,t])=>`<span class="chip${pgPreset===k?' on':''}" data-p="${k}">${t}</span>`).join('')}</div>
+    <div class="chips"><span class="chip${pgPagos?' on':''}" id="pg-pagos">${pgPagos?'✓ Mostrando também as já pagas':'Incluir as contas já pagas'}</span></div>`;
 
   const linha = p => {
         const prev = ehPrev(p);
@@ -2690,50 +2719,76 @@ function contasPagar(){
           ${p.obs?`<div class="d obs" onclick="this.classList.toggle('abrir')">${esc(p.obs)}</div>`:''}
           ${tag}</div><div class="v out">${brl(p.valor)}</div></div>`;
   };
+  const linhaPaga = p => `<div class="row ehpago"><div class="m">
+          <div class="n">${esc(p.nome)}</div>
+          <div class="d">${p.venc?'<b>'+ddmm(p.venc)+'</b> · ':''}${esc(p.desc)}</div>
+          ${p.obs?`<div class="d obs" onclick="this.classList.toggle('abrir')">${esc(p.obs)}</div>`:''}
+          <span class="tag pago">✓ pago${p.pagoEm?' em '+ddmm(p.pagoEm):''}</span></div><div class="v">${brl(p.valor)}</div></div>`;
 
-  const totais = previstas.length
-      ? `<div class="tot"><span>Com boleto em mãos</span><span style="color:var(--vermelho)">${brl(totB)}</span></div>`
-       +`<div class="tot"><span style="color:var(--ambar)">Previsão</span><span style="color:var(--ambar)">${brl(totP)}</span></div>`
-       +`<div class="tot"><span>Total do período</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`
-      : `<div class="tot"><span>Total do período</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`;
+  let totais = '';
+  if(previstas.length){
+    totais += `<div class="tot"><span>Com boleto em mãos</span><span style="color:var(--vermelho)">${brl(totB)}</span></div>`
+            + `<div class="tot"><span style="color:var(--ambar)">Previsão</span><span style="color:var(--ambar)">${brl(totP)}</span></div>`;
+  }
+  if(pgPagos){
+    totais += `<div class="tot"><span>Em aberto</span><span style="color:var(--vermelho)">${brl(totAb)}</span></div>`
+            + `<div class="tot"><span style="color:var(--verde)">Já pago</span><span style="color:var(--verde)">${brl(totPg)}</span></div>`;
+  }
+  totais += `<div class="tot"><span>${pgPagos?'Total do período (pago + em aberto)':'Total do período'}</span><span style="color:var(--vermelho)">${brl(tot)}</span></div>`;
 
-  const corpo = !PAGAR.length ? '<div class="empty">Nenhuma conta em aberto. 🎉</div>'
-    : !lista.length ? '<div class="empty">Nenhuma conta vencendo neste período.</div>'
-    : comBoleto.map(linha).join('')
-      + (previstas.length ? `<div class="subt">Previsão — compromissos certos, ainda sem cobrança emitida</div>`+previstas.map(linha).join('') : '')
+  let corpo;
+  if(!PAGAR.length && !pgPagos) corpo='<div class="empty">Nenhuma conta em aberto. 🎉</div>';
+  else if(!lista.length && !pagas.length) corpo=`<div class="empty">${pgPagos?'Nenhuma conta neste período.':'Nenhuma conta vencendo neste período.'}</div>`;
+  else {
+    corpo = (lista.length ? comBoleto.map(linha).join('')
+              + (previstas.length ? `<div class="subt">Previsão — compromissos certos, ainda sem cobrança emitida</div>`+previstas.map(linha).join('') : '')
+            : '<div class="empty">Nada em aberto neste período.</div>')
+      + (pgPagos ? `<div class="subt" style="color:var(--verde)">Já pagas — pagas no período</div>`
+              + (pagas.length ? pagas.map(linhaPaga).join('') : `<div class="empty">${pgPreset==='atras'?'Contas pagas não aparecem no atalho "Já venceu".':'Nenhuma conta paga neste período.'}</div>`) : '')
       + totais
       + `<button class="copiar" id="pg-copiar">📋 Copiar lista para mandar no WhatsApp</button>`
       + `<button class="copiar" id="pg-pdf">📄 Gerar PDF deste período</button>`;
+  }
 
   $('b-pagar').innerHTML = topo + corpo;
 
   const rerender = ()=>contasPagar();
-  $('b-pagar').querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+  $('b-pagar').querySelectorAll('.chip[data-p]').forEach(c=>c.onclick=()=>{
     pgPreset=c.dataset.p; [pgDe,pgAte]=presets[pgPreset](); rerender();
   });
+  const tg=$('pg-pagos'); if(tg) tg.onclick=()=>{ pgPagos=!pgPagos; rerender(); };
   const de=$('pg-de'), ate=$('pg-ate');
   if(de)  de.onchange  = e=>{ pgDe=e.target.value;  pgPreset='';  rerender(); };
   if(ate) ate.onchange = e=>{ pgAte=e.target.value; pgPreset='';  rerender(); };
 
   const bpdf=$('pg-pdf');
   if(bpdf) bpdf.onclick=()=>{
-    relatorioPagar(comBoleto, previstas, pgDe, pgAte);
-    const n = (pgDe||pgAte) ? (pgDe?nomeArq(dt(pgDe)):'inicio')+'_a_'+(pgAte?nomeArq(dt(pgAte)):'fim') : 'em_aberto';
-    imprimir('Contas_a_Pagar_'+n);
+    relatorioPagar(comBoleto, previstas, pgDe, pgAte, pgPagos?pagas:null);
+    const n = (pgDe||pgAte) ? (pgDe?nomeArq(dt(pgDe)):'inicio')+'_a_'+(pgAte?nomeArq(dt(pgAte)):'fim') : (pgPagos?'todas':'em_aberto');
+    imprimir((pgPagos?'Contas_Pagas_e_a_Pagar_':'Contas_a_Pagar_')+n);
   };
   const bt=$('pg-copiar');
   if(bt) bt.onclick=()=>{
     const per = (pgDe||pgAte) ? ` (${pgDe?ddmm(dt(pgDe)):'início'} a ${pgAte?ddmm(dt(pgAte)):'sem fim'})` : '';
     let t='*CONTAS A PAGAR'+per.toUpperCase()+'*\n\n';
+    if(pgPagos && lista.length) t+='_Em aberto:_\n';
     comBoleto.forEach(p=>{ t += (p.venc?ddmm(p.venc):'--/--')+' · '+p.nome+' — '+brl(p.valor)+'\n'; });
     if(previstas.length){
       t += '\n_Previsão — ainda sem cobrança emitida:_\n';
       previstas.forEach(p=>{ t += (p.venc?ddmm(p.venc):'--/--')+' · '+p.nome+' — '+brl(p.valor)+'\n'; });
     }
+    if(pgPagos && pagas.length){
+      t += '\n_Já pagas:_\n';
+      pagas.forEach(p=>{ t += '✅ '+(p.venc?ddmm(p.venc):'--/--')+' · '+p.nome+' — '+brl(p.valor)+(p.pagoEm?' (pago em '+ddmm(p.pagoEm)+')':'')+'\n'; });
+    }
     t += '\n';
     if(previstas.length){
       t += 'Com boleto em mãos: '+brl(totB)+'\n';
       t += 'Previsão: '+brl(totP)+'\n';
+    }
+    if(pgPagos){
+      t += 'Em aberto: '+brl(totAb)+'\n';
+      t += 'Já pago: '+brl(totPg)+'\n';
     }
     t += '*Total: '+brl(tot)+'*';
     const feito=()=>{ bt.textContent='✔ Copiado!'; bt.classList.add('ok');
