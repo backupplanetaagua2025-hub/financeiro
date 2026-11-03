@@ -132,6 +132,7 @@
   .tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;
     background:var(--tagbg);color:var(--muted);margin-top:4px}
   .tag.pend{background:rgba(183,121,31,.16);color:var(--ambar)}
+  .tag.rec{background:rgba(31,56,100,.12);color:var(--azul)}
   .tag.fix{background:rgba(107,79,160,.16);color:var(--roxo)}
   .tag.var{background:rgba(15,157,139,.16);color:var(--verde)}
   .tag.pes{background:rgba(192,57,43,.14);color:var(--vermelho)}
@@ -513,6 +514,8 @@
   #relPdf .n{text-align:right;white-space:nowrap}
   #relPdf .ent{color:#1E7B34;font-weight:700} #relPdf .sai{color:#C0392B;font-weight:700}
   #relPdf .pend{color:#B7791F;font-weight:700}
+  #relPdf .rd-aviso{margin:4px 0 10px;padding:7px 10px;border-left:4px solid #1F3864;background:#F3F4F6;font-size:8.8pt;color:#222}
+  #relPdf tr.fora td{color:#8a6a2a}
   #relPdf tfoot td{font-weight:800;border-top:2px solid #1F3864;border-bottom:none;background:#fff}
   #relPdf tr{page-break-inside:avoid}
   #relPdf .rd-fp{margin-top:6px;font-size:8.8pt;color:#333}
@@ -987,6 +990,16 @@ const NOMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Ag
 const SEM = ["domingo","segunda","terça","quarta","quinta","sexta","sábado"];
 const PRO_LABORE = "Pro Labore Edilânia";
 const PENDENTE = "Aguardando Pagamento";
+/* Recebimento de venda feita em outro dia: a linha foi movida para a data do pagamento e a
+   observação diz "Venda de DD/MM/AAAA — pagamento recebido em ...". Devolve o texto da data
+   da venda original (ex.: "28/10") ou "" quando é venda do próprio dia. */
+function vendaAnterior(obs, data){
+  const o=String(obs||''); if(!data || !/receb|pago/i.test(o)) return '';
+  const mm=o.match(/vendas? de ((?:\d{1,2} e )?\d{1,2}\/\d{1,2})(?:\/(\d{2,4}))?/i); if(!mm) return '';
+  const fim=mm[1].match(/(\d{1,2})\/(\d{1,2})$/); const ano=mm[2]?(+mm[2]<100?2000+ +mm[2]:+mm[2]):data.getFullYear();
+  const dv=new Date(ano, +fim[2]-1, +fim[1]);
+  return dv < data ? mm[1].replace(/\b(\d)\b/g,'0$1') : '';
+}
 const CAT_SAL = "Salários, Comissões e Encargos"; /* comissões saem daqui e vão para custo variável */
 
 /* Classificação usada no DRE da planilha */
@@ -1437,6 +1450,7 @@ function processar(buf){
 
       const it = {data:d, nome, produto:novo?prod:'', pessoa:novo?'':prod, obs,
         ent, sai, cat, forma, taxa, pend, prolab:pl, estac:ehEstac, com:ehCom,
+        ant: (ent>0 && !pend) ? vendaAnterior(obs, d) : '',
         tipo: ent>0||(!sai&&ent===0&&prod) ? 'venda' : 'despesa'};
       base.itens.push(it);
     }
@@ -1491,9 +1505,9 @@ function processar(buf){
     const md={};
     base.itens.forEach(i=>{ if(!i.data) return;
       const k=i.data.getTime();
-      if(!md[k]) md[k]={data:i.data, ent:0, taxa:0, pend:0, saiLoja:0, saiPes:0, nVendas:0, itens:[]};
+      if(!md[k]) md[k]={data:i.data, ent:0, taxa:0, pend:0, recAnt:0, saiLoja:0, saiPes:0, nVendas:0, itens:[]};
       const D=md[k];
-      D.ent+=i.ent; D.taxa+=i.taxa; if(i.pend) D.pend+=i.ent;
+      D.ent+=i.ent; D.taxa+=i.taxa; if(i.pend) D.pend+=i.ent; if(i.ant) D.recAnt+=i.ent;
       if(i.prolab) D.saiPes+=i.sai; else D.saiLoja+=i.sai;
       if(i.tipo==='venda' && i.ent>0) D.nVendas++;
       D.itens.push(i);
@@ -1944,8 +1958,9 @@ function telaDia(){
   $('d-hoje').hidden = ehHoje;
   $('d-prox').disabled = diaSel>=hj;
 
-  const ent=D?D.ent:0, sai=D?D.saiLoja:0, taxa=D?D.taxa:0, pend=D?D.pend:0, pes=D?D.saiPes:0;
+  const ent=D?D.ent:0, sai=D?D.saiLoja:0, taxa=D?D.taxa:0, pend=D?D.pend:0, pes=D?D.saiPes:0, recAnt=D?D.recAnt:0;
   const vendasDia = D ? D.itens.filter(i=>i.tipo==='venda' && i.ent>0) : [];
+  const recebido = ent - pend;   /* só o dinheiro que entrou de verdade (antes das taxas) */
   const nv = vendasDia.length;
   const ticket = nv ? vendasDia.reduce((s,i)=>s+i.ent,0)/nv : 0;
   const liq = ent - taxa - pend;
@@ -1954,18 +1969,19 @@ function telaDia(){
   /* destaque do dia: número grande + gráfico do mês comparado com o mês anterior */
   const catDia={}; if(D) D.itens.forEach(i=>{ if(i.sai>0 && !i.prolab && i.cat) catDia[i.cat]=(catDia[i.cat]||0)+i.sai; });
   const det=[];
-  det.push(nv ? nv+(nv===1?' venda':' vendas') : 'Nenhuma venda lançada neste dia');
-  if(nv && taxa) det.push(brl(ent-taxa)+' depois das taxas da maquininha ('+brl(taxa)+')');
-  else if(nv) det.push('ticket médio '+brl(ticket));
+  const nPagas = vendasDia.filter(i=>!i.pend).length, nAnt = vendasDia.filter(i=>i.ant).length;
+  det.push(nPagas ? nPagas+(nPagas===1?' pagamento recebido':' pagamentos recebidos') : (nv?'Nenhum pagamento recebido':'Nenhuma venda lançada neste dia'));
+  if(recAnt) det.push(brl(recAnt)+' de '+(nAnt===1?'venda feita em outro dia':'vendas feitas em outros dias'));
+  if(recebido && taxa) det.push(brl(recebido-taxa)+' depois das taxas da maquininha ('+brl(taxa)+')');
   const minis=[
     ['Saídas do dia', brl(sai), sai>0?'var(--vermelho)':'var(--ink)'],
     ['Saldo do dia', brl(saldo), saldo>0?'var(--verdeEsc)':(saldo<0?'var(--vermelho)':'var(--ink)')],
-    ['Ainda não pago', brl(pend), pend>0?'var(--ambar)':'var(--ink)']
+    ['Vendido a prazo · fora do saldo', brl(pend), pend>0?'var(--ambar)':'var(--ink)']
   ];
   if(pes) minis.push(['Pró-labore Edilânia', brl(pes), 'var(--roxo)']);
   $('cards-dia').innerHTML = `<div class="hp">
-      <div class="hr">${ehHoje?'Vendas de hoje':'Vendas do dia'}</div>
-      <div class="grande num">${brl(ent)}</div>
+      <div class="hr">${ehHoje?'Dinheiro que entrou hoje':'Dinheiro que entrou no dia'}</div>
+      <div class="grande num">${brl(recebido)}</div>
       <div class="det">${det.join(' · ')}</div>
       ${graficoMesHTML(m, diaSel)}
     </div>
@@ -1974,7 +1990,7 @@ function telaDia(){
 
   /* como pagaram + resumo */
   const fp={};
-  vendasDia.forEach(v=>{ const k=v.pend?'Ainda não pago':(v.forma||'não informado'); if(!fp[k]) fp[k]={v:0,n:0}; fp[k].v+=v.ent; fp[k].n++; });
+  vendasDia.filter(v=>!v.pend).forEach(v=>{ const k=v.forma||'não informado'; if(!fp[k]) fp[k]={v:0,n:0}; fp[k].v+=v.ent; fp[k].n++; });
   const listaFp = Object.entries(fp).sort((a,b)=>b[1].v-a[1].v);
   const totFp = listaFp.reduce((s,[,o])=>s+o.v,0)||1;
   const corFp = k => k==='Ainda não pago' ? 'var(--c6)' : (CORES_FP[norm(k)]||'var(--c6)');
@@ -1984,12 +2000,13 @@ function telaDia(){
   const nd = D ? D.itens.filter(i=>i.sai>0 && !i.prolab).length : 0;
   const topCat = Object.entries(catDia).sort((a,b)=>b[1]-a[1])[0];
   if(nd) frases.push(`${nd} ${nd===1?'saída':'saídas'} da loja somando ${brl(sai)}${topCat?' — a maior em '+esc(topCat[0].toLowerCase()):''}.`);
-  if(pend) frases.push(`<b>${brl(pend)}</b> saiu em produto mas ainda não entrou no caixa.`);
+  if(recAnt) frases.push(`<b>${brl(recAnt)}</b> ${nAnt===1?'é pagamento de uma venda feita':'são pagamentos de vendas feitas'} em outro dia — não é venda nova.`);
+  if(pend) frases.push(`<b>${brl(pend)}</b> foi vendido a prazo: o produto saiu, mas o dinheiro ainda não entrou e <b>não está no saldo</b>. Quando o cliente pagar, entra no dia do pagamento.`);
   $('d-resumo').innerHTML = `<div class="cab"><h3>Como pagaram</h3><span class="num">${listaFp.length?brl(totFp):''}</span></div>`
     + (listaFp.length
       ? `<div class="pilha">${listaFp.map(([k,o])=>`<i style="width:${(o.v/totFp*100).toFixed(2)}%;background:${corFp(k)}" title="${esc(k)}"></i>`).join('')}</div>
          <div class="fpl">${listaFp.map(([k,o])=>`<div><i style="background:${corFp(k)}"></i>${esc(k)}<b class="num">${brl(o.v)}</b><span class="p num">${(o.v/totFp*100).toFixed(0)}%</span></div>`).join('')}</div>`
-      : `<div class="empty" style="padding:14px 0">${ehHoje?'Ainda não tem venda lançada hoje. Assim que a planilha for atualizada, aparece aqui.':'Nenhuma venda neste dia.'}</div>`)
+      : `<div class="empty" style="padding:14px 0">${nv?'Nenhum pagamento recebido neste dia.':(ehHoje?'Ainda não tem venda lançada hoje. Assim que a planilha for atualizada, aparece aqui.':'Nenhuma venda neste dia.')}</div>`)
     + (frases.length ? `<div class="nota">${frases.join(' ')}</div>` : '');
   crescerPilha($('d-resumo'));
 
@@ -2155,17 +2172,23 @@ function ordenarJuntando(lista, cmp){
 function relatorioDia(dia, comLista){
   const m = (dia.getFullYear()===2026) ? DADOS[dia.getMonth()] : null;
   const D = (m && m.dias.find(x=>x.data.getTime()===dia.getTime())) || null;
-  const ent=D?D.ent:0, sai=D?D.saiLoja:0, taxa=D?D.taxa:0, pend=D?D.pend:0, pes=D?D.saiPes:0;
-  const saldo = ent - taxa - pend - sai;
+  const ent=D?D.ent:0, sai=D?D.saiLoja:0, taxa=D?D.taxa:0, pend=D?D.pend:0, pes=D?D.saiPes:0, recAnt=D?D.recAnt:0;
+  const recebido = ent - pend;
+  const saldo = recebido - taxa - sai;
   const vendas = D ? ordenarJuntando(D.itens.filter(i=>i.tipo==='venda'), (a,b)=>b.ent-a.ent) : [];
   const saidas = D ? D.itens.filter(i=>i.tipo!=='venda').sort((a,b)=>b.sai-a.sai) : [];
-  const nv = vendas.filter(i=>i.ent>0).length;
+  const vPagas = vendas.filter(i=>!i.pend && !i.ant), vAnt = vendas.filter(i=>i.ant), vPrazo = vendas.filter(i=>i.pend);
+  const nPag = vPagas.filter(i=>i.ent>0).length + vAnt.length;
 
-  const desc=[]; if(taxa) desc.push('taxas '+brl(taxa)); if(pend) desc.push('não pago '+brl(pend));
-  let cards = rdCard('Entradas do dia',brl(ent),'#1E7B34', nv+(nv===1?' venda':' vendas'))
+  const sub=[]; if(nPag) sub.push(nPag+(nPag===1?' pagamento':' pagamentos')); if(recAnt) sub.push(brl(recAnt)+' de vendas anteriores');
+  let cards = rdCard('Dinheiro que entrou',brl(recebido),'#1E7B34', sub.join(' · ')||'nada recebido')
             + rdCard('Saídas da loja',brl(sai),'#C0392B', saidas.filter(i=>!i.prolab).length+' lançamento(s)')
-            + rdCard('Saldo do dia',brl(saldo), saldo>=0?'#0F9D8B':'#C0392B', desc.length?'descontados '+desc.join(' e '):'entradas − saídas');
-  if(pend) cards += rdCard('A receber do dia',brl(pend),'#B7791F','aguardando pagamento');
+            + rdCard('Saldo do dia',brl(saldo), saldo>=0?'#0F9D8B':'#C0392B', taxa?'entrou − taxas ('+brl(taxa)+') − saídas':'dinheiro que entrou − saídas');
+  if(pend) cards += rdCard('Vendido a prazo',brl(pend),'#B7791F','não entrou · fora do saldo');
+
+  const aviso = (pend||recAnt) ? `<div class="rd-aviso">O <b>saldo do dia</b> só conta o dinheiro que entrou de verdade.${
+      pend?` As vendas a prazo (${brl(pend)}) aparecem só para registro e <b>não somam no saldo</b>; quando o cliente pagar, elas entram no relatório do dia do pagamento.`:''}${
+      recAnt?` ${brl(recAnt)} ${vAnt.length===1?'é pagamento de uma venda feita':'são pagamentos de vendas feitas'} em outro dia — não ${vAnt.length===1?'é venda nova':'são vendas novas'}.`:''}</div>` : '';
 
   const R = mesAte(m, dia);
   const nomeMes = m ? m.nome : NOMES[dia.getMonth()];
@@ -2180,7 +2203,8 @@ function relatorioDia(dia, comLista){
   $('relPdf').innerHTML = rdCab('Relatório Diário — Planeta Água', txt.charAt(0).toUpperCase()+txt.slice(1)) + `
     <h2>Movimento do dia</h2>
     <div class="rd-cards">${cards}</div>
-    ${tabelaVendas(vendas,false,comLista)}
+    ${aviso}
+    ${tabelaVendasDia(vPagas, vAnt, vPrazo, comLista)}
     ${tabelaSaidas(saidas,false,comLista,sai,pes)}
     <h2>${esc(nomeMes)} até dia ${String(dia.getDate()).padStart(2,'0')}</h2>
     <div class="rd-cards">${cardsMes}</div>
@@ -2203,6 +2227,28 @@ function tabelaVendas(vendas, comData, comLista){
       <td class="n">${i.taxa?brl(i.taxa):'—'}</td><td class="n ent">${brl(i.ent)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td colspan="${comData?4:3}">Total de entradas — ${vendas.length} ${vendas.length===1?'lançamento':'lançamentos'}</td>
       <td class="n">${taxa?brl(taxa):'—'}</td><td class="n">${brl(ent)}</td></tr></tfoot></table>${linhaFp(vendas)}`;
+}
+function tabelaVendasDia(pagas, ant, prazo, comLista){
+  if(!pagas.length && !ant.length && !prazo.length) return '<h2>Entradas (vendas)</h2><div class="rd-vazio">Nenhuma venda neste dia.</div>';
+  const soma=l=>l.reduce((s,i)=>s+i.ent,0), somaT=l=>l.reduce((s,i)=>s+(i.taxa||0),0);
+  const recebidas = pagas.concat(ant);
+  if(!comLista){
+    let t='<h2>Entradas</h2>';
+    t+=`<div class="rd-fp">Pagas no dia: ${pagas.length} · ${brl(soma(pagas))}${ant.length?' &nbsp;·&nbsp; Recebimento de vendas anteriores: '+ant.length+' · '+brl(soma(ant)):''}${somaT(recebidas)?' &nbsp;·&nbsp; taxas '+brl(somaT(recebidas)):''}</div>`;
+    t+=linhaFp(recebidas);
+    if(prazo.length) t+=`<div class="rd-fp pend">Vendido a prazo (fora do saldo): ${prazo.length} · ${brl(soma(prazo))}</div>`;
+    return t;
+  }
+  const tab=(tit, l, col, fora)=> l.length ? `<h2>${tit}</h2><table><thead><tr><th>Cliente</th><th>Produto</th><th>${col}</th><th class="n">Taxa</th><th class="n">Valor</th></tr></thead>
+    <tbody>${l.map(i=>`<tr class="${fora?'fora':''}"><td>${esc(i.nome)}</td><td>${esc(i.produto||'—')}</td>
+      <td class="${fora?'pend':''}">${fora?'A prazo — ainda não pago':(i.ant?'Venda de '+esc(i.ant)+' · '+esc(i.forma||'—'):esc(i.forma||'—'))}</td>
+      <td class="n">${i.taxa?brl(i.taxa):'—'}</td><td class="n ${fora?'pend':'ent'}">${brl(i.ent)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">Total — ${l.length} ${l.length===1?'lançamento':'lançamentos'}${fora?' (não soma no saldo)':''}</td>
+      <td class="n">${somaT(l)?brl(somaT(l)):'—'}</td><td class="n">${brl(soma(l))}</td></tr></tfoot></table>` : '';
+  return tab('Vendas pagas no dia', pagas, 'Pagamento', false)
+    + tab('Recebimentos de vendas anteriores', ant, 'Venda original · pagamento', false)
+    + (recebidas.length ? linhaFp(recebidas) : '')
+    + tab('Vendido a prazo — ainda não pago (fora do saldo)', prazo, 'Situação', true);
 }
 function tabelaSaidas(saidas, comData, comLista, sai, pes){
   if(!saidas.length) return '<h2>Saídas</h2><div class="rd-vazio">Nenhuma saída no período.</div>';
@@ -2431,7 +2477,8 @@ function dias(m){
 
 function itemHTML(i){
   const venda=i.tipo==='venda';
-  const etq = i.pend ? '<span class="tag pend">Aguardando pagamento</span>'
+  const etq = i.pend ? '<span class="tag pend">Aguardando pagamento · não entrou no caixa</span>'
+    : i.ant ? `<span class="tag rec">Recebimento da venda de ${esc(i.ant)}</span>${i.forma?` <span class="tag">${esc(i.forma)}${i.taxa?' · taxa '+brl(i.taxa):''}</span>`:''}`
     : venda ? (i.forma?`<span class="tag">${esc(i.forma)}${i.taxa?' · taxa '+brl(i.taxa):''}</span>`:'')
     : i.prolab ? '<span class="tag pes">Pró-labore Edilânia</span>'
     : ((CAT_VAR.includes(i.cat) && !i.estac) || i.com) ? '<span class="tag var">Custo variável</span>'
