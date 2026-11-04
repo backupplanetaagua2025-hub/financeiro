@@ -1410,6 +1410,11 @@ function processar(buf){
   const peq = linhas('Ponto de Equilíbrio');
   if(peq){ const v=num((peq[9]||[])[1]); if(v>0) CFG.plComb=v; }
 
+  /* ---- fluxo de caixa: começo em 'Fluxo de Caixa'!B5 e saldo inicial em B6 (bancos + mãos, sem a reserva) ---- */
+  CFG.fcIni=null; CFG.fcSaldo=0;
+  const fc = linhas('Fluxo de Caixa');
+  if(fc){ const d=dt((fc[4]||[])[1]); if(d){ CFG.fcIni=d; CFG.fcSaldo=num((fc[5]||[])[1]); } }
+
   /* ---- meses ---- */
   DADOS = MESES.map((sig,mi)=>{
     const L = linhas(sig+' 2026');
@@ -1927,6 +1932,24 @@ function giroAte(mi, ate){
       && norm(g.status)==='a devolver' && g.data<=ate).reduce((s,g)=>s+g.valor,0);
 }
 
+/* dinheiro da loja no fim do dia (bancos + dinheiro em mãos, sem a reserva) — mesma conta da aba "Fluxo de Caixa":
+   saldo inicial + o que entrou (sem taxas e sem venda a prazo) − tudo o que saiu (inclusive Edilânia);
+   conta paga pelo capital de giro não sai do caixa no dia, só quando é devolvida */
+function caixaAte(ate){
+  if(!CFG.fcIni || !ate || ate<CFG.fcIni) return null;
+  let s=CFG.fcSaldo;
+  DADOS.forEach(m=>m.itens.forEach(i=>{
+    if(!i.data || i.data<CFG.fcIni || i.data>ate) return;
+    if(!i.pend) s+=i.ent-(i.taxa||0);
+    s-=i.sai;
+  }));
+  GIROLIST.forEach(g=>{
+    if(g.data && g.data>=CFG.fcIni && g.data<=ate) s+=g.valor;
+    if(norm(g.status)==='devolvido' && g.devolucao && g.devolucao>=CFG.fcIni && g.devolucao<=ate) s-=g.valor;
+  });
+  return s;
+}
+
 /* números do mês até o dia escolhido — mesmas regras dos cartões da planilha */
 function mesAte(m, ate){
   const r={ent:0,taxas:0,receber:0,brutas:0,prolab:0,nVendas:0,ticket:0,fat:0,desp:0,saldo:0,giro:0};
@@ -1979,6 +2002,8 @@ function telaDia(){
     ['Vendido a prazo · fora do saldo', brl(pend), pend>0?'var(--ambar)':'var(--ink)']
   ];
   if(pes) minis.push(['Pró-labore Edilânia', brl(pes), 'var(--roxo)']);
+  const cx = caixaAte(diaSel);
+  if(cx!==null) minis.unshift([(ehHoje?'Dinheiro em caixa agora':'Dinheiro em caixa no fim do dia'), brl(cx), cx>=0?'var(--ink)':'var(--vermelho)']);
   $('cards-dia').innerHTML = `<div class="hp">
       <div class="hr">${ehHoje?'Dinheiro que entrou hoje':'Dinheiro que entrou no dia'}</div>
       <div class="grande num">${brl(recebido)}</div>
@@ -2185,6 +2210,8 @@ function relatorioDia(dia, comLista){
             + rdCard('Saídas da loja',brl(sai),'#C0392B', saidas.filter(i=>!i.prolab).length+' lançamento(s)')
             + rdCard('Saldo do dia',brl(saldo), saldo>=0?'#0F9D8B':'#C0392B', taxa?'entrou − taxas ('+brl(taxa)+') − saídas':'dinheiro que entrou − saídas');
   if(pend) cards += rdCard('Vendido a prazo',brl(pend),'#B7791F','não entrou · fora do saldo');
+  const cx = caixaAte(dia);
+  if(cx!==null) cards += rdCard('Dinheiro em caixa no fim do dia',brl(cx), cx>=0?'#1F3864':'#C0392B','bancos + dinheiro em mãos · sem a reserva');
 
   const aviso = (pend||recAnt) ? `<div class="rd-aviso">O <b>saldo do dia</b> só conta o dinheiro que entrou de verdade.${
       pend?` As vendas a prazo (${brl(pend)}) aparecem só para registro e <b>não somam no saldo</b>; quando o cliente pagar, elas entram no relatório do dia do pagamento.`:''}${
