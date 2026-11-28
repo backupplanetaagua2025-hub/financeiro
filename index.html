@@ -790,9 +790,13 @@
   .cxfolha .cxcab{display:grid;grid-template-columns:1fr 92px 92px;gap:6px;padding:8px 12px;
     background:var(--card2);font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
   .cxfolha .cxcab span:not(:first-child){text-align:right}
-  .cxfolha .cxdia{padding:7px 12px;font-size:12px;font-weight:700;color:var(--azul);background:var(--azulSuave);
-    display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line)}
-  .cxfolha .cxdia span{font-weight:600;color:var(--muted)}
+  .cxfolha .cxdia{padding:8px 12px;font-size:12.5px;background:var(--azulSuave);border-top:1px solid var(--line);
+    display:grid;grid-template-columns:1fr 92px 92px;gap:6px;align-items:center}
+  .cxfolha .cxdia .h b{display:block;color:var(--azul);font-weight:700;white-space:nowrap}
+  .cxfolha .cxdia .h small{display:block;color:var(--muted);font-size:11px;font-weight:600;margin-top:1px}
+  .cxfolha .cxdia .h small b{display:inline;color:var(--ink);font-weight:700}
+  .cxfolha .cxdia .e,.cxfolha .cxdia .s{text-align:right;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .cxfolha .cxdia .e{color:var(--verdeEsc)} .cxfolha .cxdia .s{color:var(--vermelho)}
   .cxl{display:grid;grid-template-columns:1fr 92px 92px;gap:6px;padding:9px 12px;border-top:1px solid var(--line2,var(--line));
     align-items:start;font-size:13px}
   .cxl .h b{display:block;font-weight:600;overflow-wrap:anywhere}
@@ -819,18 +823,22 @@
   .cxfolha .cxdia{cursor:pointer}
   .cxfolha .cxdia .ar{display:inline-block;transition:transform .2s ease;margin-right:4px}
   .cxfolha .cxdia.ab .ar{transform:rotate(90deg)}
-  .cxfolha .cxdia em{font-style:normal;font-weight:600;color:var(--muted);font-size:11.5px}
-  @media (max-width:699px){
-    .cxfolha .cxcab,.cxl{grid-template-columns:1fr auto}
-    .cxfolha .cxcab .so-pc,.cxl .vz{display:none}
-    .cxfolha .cxcab .so-cel{display:block !important;text-align:right}
-    .cxl .e::before{content:'+ '} .cxl .s::before{content:'− '}
-    .cxfolha .cxdia{flex-wrap:wrap}
-  }
-  .cxfolha .cxcab .so-cel{display:none}
   .cxsd .dia-h .dv small{display:block;font-size:11px;font-weight:600;color:var(--muted);text-align:right}
-  @media (min-width:700px){ .cxdet{grid-template-columns:1fr 1fr} .cxfolha .cxcab,.cxl,.cxrod .lin{grid-template-columns:1fr 120px 120px} }
-  @media (max-width:380px){ .cxfolha .cxcab,.cxl,.cxrod .lin{grid-template-columns:1fr 80px 80px} .cxl{font-size:12.5px} }
+  @media (min-width:700px){ .cxdet{grid-template-columns:1fr 1fr} .cxfolha .cxcab,.cxl,.cxfolha .cxdia,.cxrod .lin{grid-template-columns:1fr 120px 120px} }
+  .cxv .rs{font-weight:inherit}
+  @media (max-width:699px){
+    .cxfolha .cxcab,.cxl,.cxfolha .cxdia,.cxrod .lin{grid-template-columns:1fr 74px 74px;gap:6px;padding-left:10px;padding-right:10px}
+    .cxl .e,.cxl .s,.cxfolha .cxdia .e,.cxfolha .cxdia .s{font-size:12.5px}
+    .cxv .rs{display:none}
+    .cxfolha .cxcab .rsc{display:inline !important}
+  }
+  .cxfolha .cxcab .rsc{display:none}
+  @media (max-width:370px){
+    .cxfolha .cxcab,.cxl,.cxfolha .cxdia,.cxrod .lin{grid-template-columns:1fr 68px 68px;gap:4px}
+    .cxl{font-size:12.5px} .cxl .e,.cxl .s,.cxfolha .cxdia .e,.cxfolha .cxdia .s{font-size:12px}
+  }
+  .cxsd .ds .en,.cxsd .ds .sa{display:inline-block;white-space:nowrap;margin-right:10px;font-variant-numeric:tabular-nums}
+  .cxsd .ds .en b{color:var(--verdeEsc);font-weight:600} .cxsd .ds .sa b{color:var(--vermelho);font-weight:600}
 </style>
 </head>
 <body>
@@ -2112,6 +2120,7 @@ function cxResumo(de, ate){
   return {de:ini, ate, L, ent, sai, ant, atual: ant==null?null:ant+ent-sai, prazo, nPrazo, cortou: ini>de};
 }
 const dSem = d => SEM[d.getDay()];
+const cxv = v => v ? `<span class="cxv"><span class="rs">R$&nbsp;</span>${(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>` : '';
 function cxPeriodoTxt(de, ate){
   if(de.getTime()===ate.getTime()){ const t=porExtenso(de); return t.charAt(0).toUpperCase()+t.slice(1); }
   return fmtData(de)+' a '+fmtData(ate);
@@ -2166,7 +2175,7 @@ function telaCaixa(){
 
   /* folha: histórico, entradas, saídas */
   const linha = x=>`<div class="cxl${x.esp?' esp':''}"><div class="h"><b>${esc(x.n)}</b>${x.d?`<small>${esc(x.d)}</small>`:''}</div>
-      <div class="e${x.e?'':' vz'}">${x.e?brl(x.e):''}</div><div class="s${x.s?'':' vz'}">${x.s?brl(x.s):''}</div></div>`;
+      <div class="e">${cxv(x.e)}</div><div class="s">${cxv(x.s)}</div></div>`;
   let corpo='';
   if(um) corpo = R.L.map(linha).join('');
   else {
@@ -2176,16 +2185,19 @@ function telaCaixa(){
     ks.forEach(t=>{
       const l=porDia[t]; const dd=new Date(t);
       const e=l.reduce((s,x)=>s+x.e,0), sa=l.reduce((s,x)=>s+x.s,0);
-      corpo += `<div class="cxdia${aberto?' ab':''}" data-g="${t}"><div><i class="ar">&rsaquo;</i>${ddmm(dd)} · ${dSem(dd)} <em>· entrou ${brl(e)} · saiu ${brl(sa)}</em></div><span>fim do dia ${brl(caixaAte(dd))}</span></div>`
+      const fd=caixaAte(dd);
+      corpo += `<div class="cxdia${aberto?' ab':''}" data-g="${t}">
+          <div class="h"><b><i class="ar">&rsaquo;</i>${ddmm(dd)} · ${dSem(dd)}</b><small>fim do dia <b>${brl(fd)}</b></small></div>
+          <div class="e">${cxv(e)}</div><div class="s">${cxv(sa)}</div></div>`
         + `<div class="cxgrp" id="cxg-${t}"${aberto?'':' hidden'}>${l.map(linha).join('')}</div>`;
     });
   }
   $('c-cxfolha').textContent = R.L.length ? R.L.length+(R.L.length===1?' lançamento':' lançamentos') : 'nenhum';
   $('b-cxfolha').innerHTML = `<div class="cxfolha">
-      <div class="cxcab"><span>Histórico</span><span class="so-pc">Entradas</span><span class="so-pc">Saídas</span><span class="so-cel">Valor</span></div>
+      <div class="cxcab"><span>Histórico</span><span>Entradas<span class="rsc"> (R$)</span></span><span>Saídas<span class="rsc"> (R$)</span></span></div>
       ${corpo || '<div class="empty">Nenhum dinheiro entrou ou saiu neste período.</div>'}
       <div class="cxrod">
-        <div class="lin tt"><span>Totais</span><span style="color:var(--verdeEsc)">${brl(R.ent)}</span><span style="color:var(--vermelho)">${brl(R.sai)}</span></div>
+        <div class="lin tt"><span>Totais</span><span style="color:var(--verdeEsc)">${cxv(R.ent)||'0,00'}</span><span style="color:var(--vermelho)">${cxv(R.sai)||'0,00'}</span></div>
         <div class="lin sa"><span>Saldo anterior</span><span>${brl(R.ant)}</span></div>
         <div class="lin sf"><span>Saldo atual</span><span style="color:${R.atual>=0?'var(--verdeEsc)':'var(--vermelho)'}">${brl(R.atual)}</span></div>
       </div>
@@ -2229,9 +2241,9 @@ function telaCaixa(){
       ${cxGrafico(serie)}
       <div style="margin-top:10px">${serie.slice().reverse().map(x=>{
         const sel = um && x.d.getTime()===cxDe.getTime();
-        const det=[]; if(x.e) det.push('entrou '+brl(x.e)); if(x.s) det.push('saiu '+brl(x.s));
+        const det=[]; if(x.e) det.push(`<span class="en">entrou <b>${brl(x.e)}</b></span>`); if(x.s) det.push(`<span class="sa">saiu <b>${brl(x.s)}</b></span>`);
         return `<div class="dia"><div class="dia-h${sel?' sel':''}" data-cxd="${isoData(x.d)}">
-          <div class="dd">${ddmm(x.d)}</div><div class="ds">${dSem(x.d)}<br>${det.join(' · ')||'sem movimento'}</div>
+          <div class="dd">${ddmm(x.d)}</div><div class="ds">${dSem(x.d)}<br>${det.join('')||'sem movimento'}</div>
           <div class="dv" style="color:${x.fim>=0?'var(--ink)':'var(--vermelho)'}">${brl(x.fim)}<small>${x.fim-x.ant>=0?'+':'−'}${brl(Math.abs(x.fim-x.ant))}</small></div></div></div>`;
       }).join('')}</div>` : '<div class="empty">Sem dias para mostrar.</div>';
   ligarTip($('b-cxdias'));
